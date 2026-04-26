@@ -1,0 +1,2919 @@
+
+<!DOCTYPE html>
+<html lang="bn">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>হাজী মোদাচ্ছের ক্লথ স্টোর - সিকিউর POS v8</title>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <style>
+        /* ═══════════════════════════════════════ CSS ═══════════════════════════════════════ */
+        :root {
+            --blue: #1e88e5;
+            --dark: #263238;
+            --gold: #ffd600;
+            --red: #d32f2f;
+            --green: #43a047;
+        }
+
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: #f0f2f5;
+            margin: 0;
+            padding: 10px;
+            color: #333;
+        }
+
+        #auth-overlay {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: #02050d;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            overflow: hidden;
+        }
+        #login-canvas {
+            position: absolute;
+            inset: 0;
+            width: 100%; height: 100%;
+        }
+        /* Store brand top */
+        .store-brand {
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            text-align: center;
+            padding-top: 6vh;
+            z-index: 3;
+            pointer-events: none;
+        }
+        .store-brand-name {
+            font-family: Georgia, 'Times New Roman', serif;
+            font-size: clamp(13px, 2.5vw, 18px);
+            font-weight: 400;
+            letter-spacing: 6px;
+            text-transform: uppercase;
+            color: rgba(212, 175, 55, 0.6);
+            animation: brandPulse 5s ease-in-out infinite;
+        }
+        .store-brand-line {
+            display: inline-block;
+            width: 60px; height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(212,175,55,0.5), transparent);
+            margin: 6px 12px;
+            vertical-align: middle;
+        }
+        @keyframes brandPulse {
+            0%, 100% { opacity: 0.5; letter-spacing: 6px; }
+            50%       { opacity: 0.9; letter-spacing: 7px; }
+        }
+        /* login card — premium glass */
+        .login-card {
+            position: relative; z-index: 2;
+            background: linear-gradient(145deg,
+                rgba(20,14,5,0.75) 0%,
+                rgba(10,8,4,0.85) 100%);
+            backdrop-filter: blur(32px) saturate(1.4);
+            -webkit-backdrop-filter: blur(32px) saturate(1.4);
+            padding: 44px 36px;
+            border-radius: 20px;
+            box-shadow:
+                0 0 0 1px rgba(212,175,55,0.25),
+                0 0 40px rgba(212,175,55,0.08),
+                0 40px 80px rgba(0,0,0,0.7),
+                inset 0 1px 0 rgba(212,175,55,0.15);
+            width: 360px;
+            text-align: center;
+            border: none;
+        }
+        /* Gold divider */
+        .card-divider {
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(212,175,55,0.5), transparent);
+            margin: 0 0 24px 0;
+        }
+
+        .login-card h2 {
+            margin-bottom: 5px;
+            font-size: 22px;
+            color: #fff;
+            font-weight: 600;
+        }
+
+        .login-card p {
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 14px;
+            margin-bottom: 30px;
+        }
+
+        .role-selector {
+            display: flex;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 12px;
+            padding: 5px;
+            margin-bottom: 25px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .role-tab {
+            flex: 1;
+            padding: 12px;
+            cursor: pointer;
+            border-radius: 10px;
+            font-size: 14px;
+            transition: 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .role-tab.active {
+            background: var(--blue);
+            color: white;
+            box-shadow: 0 4px 15px rgba(30, 136, 229, 0.4);
+        }
+
+        .login-card input {
+            width: 100%;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.05);
+            font-size: 18px;
+            color: white;
+            text-align: center;
+            box-sizing: border-box;
+            outline: none;
+            transition: 0.3s;
+        }
+
+        .login-card input:focus {
+            border-color: var(--blue);
+            background: rgba(255, 255, 255, 0.1);
+            box-shadow: 0 0 10px rgba(30, 136, 229, 0.2);
+        }
+
+        .login-btn {
+            width: 100%;
+            padding: 16px;
+            border-radius: 12px;
+            border: none;
+            background: var(--blue);
+            color: white;
+            font-weight: bold;
+            font-size: 18px;
+            cursor: pointer;
+            transition: 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .login-btn:hover {
+            background: #1565c0;
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .app-container {
+            max-width: 1350px;
+            margin: auto;
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+            display: grid;
+            grid-template-columns: 1.5fr 1.2fr;
+        }
+
+        @media (max-width: 768px) {
+            .app-container {
+                grid-template-columns: 1fr !important;
+            }
+
+            .left-panel {
+                border-right: none;
+                border-bottom: 2px solid #eee;
+                padding: 10px;
+            }
+
+            .right-panel {
+                max-height: none;
+                padding: 10px;
+            }
+
+            .header h1 {
+                font-size: 20px;
+            }
+
+            .table-header,
+            .item-row {
+                grid-template-columns: 1.8fr 0.8fr 1fr 35px !important;
+                font-size: 12px;
+            }
+
+            .calc-row label {
+                width: 100px;
+                font-size: 12px;
+            }
+
+            .calc-row input {
+                width: 80px;
+            }
+
+            .final-total {
+                font-size: 20px;
+            }
+
+            body {
+                padding: 5px;
+            }
+
+            input,
+            select {
+                font-size: 16px !important;
+            }
+        }
+
+        .header {
+            background: var(--blue);
+            color: white;
+            text-align: center;
+            padding: 15px;
+            grid-column: 1 / -1;
+            border-bottom: 4px solid var(--gold);
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 26px;
+            letter-spacing: 1px;
+        }
+
+        .status-bar {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            background: #eceff1;
+            padding: 12px;
+            grid-column: 1 / -1;
+        }
+
+        .status-box {
+            background: white;
+            padding: 10px;
+            border-radius: 8px;
+            text-align: center;
+            border: 1px solid #cfd8dc;
+            transition: 0.3s;
+        }
+
+        .status-box span {
+            color: var(--blue);
+            display: block;
+            font-size: 22px;
+            font-weight: bold;
+        }
+
+        .left-panel {
+            padding: 20px;
+            border-right: 1px solid #eee;
+        }
+
+        .right-panel {
+            background: #fafafa;
+            padding: 20px;
+            overflow-y: auto;
+            max-height: 90vh;
+        }
+
+        input,
+        select {
+            width: 100%;
+            padding: 10px;
+            border: 1.5px solid #cfd8dc;
+            border-radius: 6px;
+            box-sizing: border-box;
+            font-size: 14px;
+            outline: none;
+        }
+
+        input:focus {
+            border-color: var(--blue);
+        }
+
+        .table-header {
+            display: grid;
+            grid-template-columns: 2.2fr 0.8fr 1fr 40px;
+            background: var(--dark);
+            color: white;
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: bold;
+            text-align: center;
+        }
+
+        .item-row {
+            display: grid;
+            grid-template-columns: 2.2fr 0.8fr 1fr 40px;
+            gap: 8px;
+            margin-top: 8px;
+            align-items: center;
+        }
+
+        .calc-section {
+            background: var(--dark);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 20px;
+        }
+
+        .calc-row {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            margin-bottom: 8px;
+            gap: 15px;
+        }
+
+        .calc-row label {
+            font-size: 14px;
+            font-weight: bold;
+            width: 140px;
+            text-align: right;
+        }
+
+        .calc-row input,
+        .calc-row select {
+            width: 110px;
+            text-align: right;
+            background: white;
+            font-weight: bold;
+            border: none;
+        }
+
+        .final-total {
+            border-top: 2px dashed #546e7a;
+            padding-top: 15px;
+            text-align: right;
+            font-size: 26px;
+            color: var(--gold);
+            font-weight: bold;
+        }
+
+        .btn-main {
+            width: 100%;
+            padding: 15px;
+            border: none;
+            border-radius: 8px;
+            background: var(--green);
+            color: white;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 20px;
+            transition: 0.3s;
+        }
+
+        .btn-main:hover {
+            background: #388e3c;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+
+        .btn-add {
+            background: #fff;
+            border: 2px dashed #90a4ae;
+            padding: 10px;
+            width: 100%;
+            cursor: pointer;
+            margin-top: 10px;
+            border-radius: 6px;
+            font-weight: bold;
+            color: #546e7a;
+        }
+
+        .btn-return {
+            background: #ffebee;
+            border: 2px dashed var(--red);
+            padding: 10px;
+            width: 100%;
+            cursor: pointer;
+            margin-top: 8px;
+            border-radius: 6px;
+            font-weight: bold;
+            color: var(--red);
+        }
+
+        .tool-box {
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            border: 1px solid #dee2e6;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+        }
+
+        .admin-only {
+            display: none;
+        }
+
+        .pending-box {
+            background: #fff9c4;
+            border: 2px solid #fbc02d;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+
+        .barcode-scanner-box {
+            background: #e3f2fd;
+            padding: 10px;
+            border-radius: 8px;
+            margin-top: 10px;
+            margin-bottom: 15px;
+            border: 1px solid var(--blue);
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        #reader {
+            width: 100%;
+            border-radius: 8px;
+            overflow: hidden;
+            display: none;
+            margin-bottom: 10px;
+        }
+
+        .mgmt-box {
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            border: 1px solid #dee2e6;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+        }
+
+        .mgmt-title {
+            margin-top: 0;
+            color: var(--dark);
+            font-size: 16px;
+            border-bottom: 2px solid var(--blue);
+            padding-bottom: 5px;
+            margin-bottom: 10px;
+        }
+
+        .link-btn-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+
+        .dynamic-link-btn {
+            padding: 8px 12px;
+            background: var(--blue);
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: bold;
+            transition: 0.3s;
+        }
+
+        .dynamic-link-btn:hover {
+            background: var(--dark);
+            transform: scale(1.05);
+        }
+
+        .mgmt-action-btn {
+            width: 100%;
+            padding: 8px;
+            background: #eceff1;
+            border: 1px dashed #90a4ae;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            color: var(--dark);
+        }
+
+        #mgmt-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 10000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .mgmt-modal-content {
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            width: 90%;
+            max-width: 400px;
+        }
+
+        .mgmt-list-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px;
+            border-bottom: 1px solid #eee;
+            font-size: 14px;
+        }
+
+        .del-x {
+            color: var(--red);
+            font-weight: bold;
+            cursor: pointer;
+            border: none;
+            background: none;
+            font-size: 18px;
+        }
+
+        @media print {
+            @page {
+                size: 58mm auto;
+                margin: 0;
+            }
+
+            body * {
+                visibility: hidden;
+            }
+
+            #print-area,
+            #print-area * {
+                visibility: visible;
+            }
+
+            #print-area {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 58mm;
+                margin: 0;
+                padding: 0;
+                overflow: hidden;
+            }
+        }
+
+        .bk-bar {
+            max-width: 1350px;
+            margin: 0 auto 8px auto;
+            background: #1a2535;
+            border-radius: 12px;
+            padding: 10px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border: 1px solid #2a3a50;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .bk-bar::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 100%;
+            background: #00e676;
+            transition: background 0.4s;
+        }
+
+        .bk-bar.saving::before {
+            background: #ffd600;
+        }
+
+        .bk-bar.error::before {
+            background: #ff5252;
+        }
+
+        .bk-bar.reading::before {
+            background: #40c4ff;
+        }
+
+        .bk-bar.pending::before {
+            background: #ff9800;
+        }
+
+        .bk-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .bk-ico {
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            background: rgba(0, 230, 118, 0.12);
+            border: 1px solid rgba(0, 230, 118, 0.25);
+            flex-shrink: 0;
+            transition: all 0.4s;
+        }
+
+        .bk-bar.saving .bk-ico {
+            background: rgba(255, 214, 0, 0.12);
+            border-color: rgba(255, 214, 0, 0.25);
+            animation: bkpls 1s infinite;
+        }
+
+        .bk-bar.reading .bk-ico {
+            background: rgba(64, 196, 255, 0.12);
+            border-color: rgba(64, 196, 255, 0.25);
+        }
+
+        .bk-bar.error .bk-ico {
+            background: rgba(255, 82, 82, 0.12);
+            border-color: rgba(255, 82, 82, 0.25);
+        }
+
+        .bk-bar.pending .bk-ico {
+            background: rgba(255, 152, 0, 0.12);
+            border-color: rgba(255, 152, 0, 0.25);
+        }
+
+        @keyframes bkpls {
+
+            0%,
+            100% {
+                transform: scale(1)
+            }
+
+            50% {
+                transform: scale(1.1)
+            }
+        }
+
+        .bk-txt h5 {
+            font-size: 13px;
+            font-weight: 700;
+            color: #e0e8f0;
+            margin: 0 0 2px 0;
+        }
+
+        .bk-txt p {
+            font-size: 11px;
+            color: #6b8099;
+            margin: 0;
+        }
+
+        .bk-bdg {
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 700;
+            background: rgba(0, 230, 118, 0.15);
+            color: #00e676;
+            border: 1px solid rgba(0, 230, 118, 0.3);
+            white-space: nowrap;
+            transition: all 0.4s;
+        }
+
+        .bk-bar.saving .bk-bdg {
+            background: rgba(255, 214, 0, 0.15);
+            color: #ffd600;
+            border-color: rgba(255, 214, 0, 0.3);
+        }
+
+        .bk-bar.reading .bk-bdg {
+            background: rgba(64, 196, 255, 0.15);
+            color: #40c4ff;
+            border-color: rgba(64, 196, 255, 0.3);
+        }
+
+        .bk-bar.error .bk-bdg {
+            background: rgba(255, 82, 82, 0.15);
+            color: #ff5252;
+            border-color: rgba(255, 82, 82, 0.3);
+        }
+
+        .bk-bar.pending .bk-bdg {
+            background: rgba(255, 152, 0, 0.15);
+            color: #ff9800;
+            border-color: rgba(255, 152, 0, 0.3);
+        }
+
+        #bk-toasts {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            z-index: 99999;
+        }
+
+        .bk-toast {
+            background: #1a2535;
+            border: 1px solid #2a3a50;
+            border-radius: 12px;
+            padding: 12px 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-width: 260px;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+            animation: tkIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .bk-toast::after {
+            content: "";
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            height: 3px;
+            width: 100%;
+            background: #00e676;
+            animation: tkShrink 3s linear forwards;
+        }
+
+        .bk-toast.reading::after {
+            background: #40c4ff;
+        }
+
+        .bk-toast.error::after {
+            background: #ff5252;
+        }
+
+        @keyframes tkIn {
+            from {
+                transform: translateX(120%);
+                opacity: 0
+            }
+
+            to {
+                transform: translateX(0);
+                opacity: 1
+            }
+        }
+
+        @keyframes tkOut {
+            from {
+                transform: translateX(0);
+                opacity: 1
+            }
+
+            to {
+                transform: translateX(120%);
+                opacity: 0
+            }
+        }
+
+        @keyframes tkShrink {
+            from {
+                width: 100%
+            }
+
+            to {
+                width: 0%
+            }
+        }
+
+        .bk-ti {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            background: rgba(0, 230, 118, 0.12);
+            flex-shrink: 0;
+        }
+
+        .bk-toast.reading .bk-ti {
+            background: rgba(64, 196, 255, 0.12);
+        }
+
+        .bk-toast.error .bk-ti {
+            background: rgba(255, 82, 82, 0.12);
+        }
+
+        .bk-tb h6 {
+            font-size: 12px;
+            font-weight: 700;
+            color: #e0e8f0;
+            margin: 0 0 2px 0;
+        }
+
+        .bk-tb p {
+            font-size: 11px;
+            color: #6b8099;
+            margin: 0;
+        }
+        /* ── Product Autocomplete ── */
+        .p-name-wrap {
+            position: relative;
+        }
+        .product-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: #fff;
+            border: 1.5px solid var(--blue);
+            border-top: none;
+            border-radius: 0 0 8px 8px;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+            z-index: 9999;
+            max-height: 220px;
+            overflow-y: auto;
+        }
+        .product-dropdown-item {
+            padding: 9px 12px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+            border-bottom: 1px solid #f0f0f0;
+            font-size: 13px;
+            transition: background 0.15s;
+        }
+        .product-dropdown-item:last-child { border-bottom: none; }
+        .product-dropdown-item:hover, .product-dropdown-item.active {
+            background: #e3f2fd;
+        }
+        .pd-name { flex: 1; color: #263238; font-weight: 500; }
+        .pd-serial { font-size: 11px; color: #90a4ae; }
+        .pd-price { color: var(--blue); font-weight: bold; white-space: nowrap; }
+        .pd-stock { font-size: 11px; padding: 2px 7px; border-radius: 10px; white-space: nowrap; }
+        .pd-stock.low { background: #fff3e0; color: #e65100; }
+        .pd-stock.ok  { background: #e8f5e9; color: #2e7d32; }
+        .pd-stock.zero{ background: #ffebee; color: #c62828; }
+        /* ── Dark Mode ── */
+        body.dark-mode { background: #121212; color: #e0e0e0; }
+        body.dark-mode .app-container { background: #1e1e1e; }
+        body.dark-mode .header { background: #0d47a1; }
+        body.dark-mode .left-panel { background: #1e1e1e; border-color: #333; }
+        body.dark-mode .right-panel { background: #252525; }
+        body.dark-mode .status-bar { background: #2a2a2a; }
+        body.dark-mode .status-box { background: #333; border-color: #444; color: #e0e0e0; }
+        body.dark-mode input, body.dark-mode select { background: #2a2a2a !important; border-color: #444; color: #e0e0e0; }
+        body.dark-mode .calc-section { background: #1a1a1a; }
+        body.dark-mode .tool-box { background: #2a2a2a; border-color: #444; }
+        body.dark-mode .mgmt-box { background: #2a2a2a; border-color: #444; }
+        body.dark-mode .pending-box { background: #332a00; border-color: #665000; }
+        body.dark-mode #memo-preview { background: #2a2a2a !important; border-color: #444; color: #e0e0e0; }
+        body.dark-mode .btn-add { background: #2a2a2a; border-color: #555; color: #aaa; }
+        body.dark-mode .btn-return { background: #2a1a1a; }
+        body.dark-mode .login-card { background: rgba(255,255,255,0.05); }
+        #dark-toggle {
+            position: fixed; bottom: 16px; right: 16px; z-index: 8000;
+            width: 46px; height: 46px; border-radius: 50%;
+            background: #263238; color: #ffd600;
+            border: 2px solid #546e7a; cursor: pointer;
+            font-size: 20px; box-shadow: 0 3px 12px rgba(0,0,0,0.35);
+            transition: all 0.3s; display: flex; align-items: center; justify-content: center;
+        }
+        #dark-toggle:hover { transform: scale(1.1); border-color: #ffd600; }
+        /* ── Offline Banner ── */
+        #offline-banner {
+            display: none; position: fixed; top: 0; left: 0; right: 0; z-index: 10000;
+            background: #e65100; color: white; text-align: center;
+            padding: 7px 12px; font-size: 13px; font-weight: bold;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="offline-banner">📵 ইন্টারনেট নেই — Offline মোডে কাজ চলছে। সংযোগ ফিরলে ব্যাকআপ sync হবে।</div>
+    <button id="dark-toggle" onclick="toggleDark()" title="Dark / Light Mode">🌙</button>
+    <div class="bk-bar" id="bkBar" style="display:none;">
+        <div class="bk-left">
+            <div class="bk-ico" id="bkIco">☁️</div>
+            <div class="bk-txt">
+                <h5 id="bkTitle">ব্যাকআপ সিস্টেম সক্রিয়</h5>
+                <p id="bkDesc">সর্বশেষ ব্যাকআপ: এখনো হয়নি</p>
+            </div>
+        </div>
+        <div class="bk-bdg" id="bkBdg">প্রস্তুত</div>
+    </div>
+    <div id="bk-toasts"></div>
+    <div id="auth-overlay">
+        <canvas id="login-canvas"></canvas>
+        <div class="store-brand">
+            <span class="store-brand-line"></span>
+            <span class="store-brand-name">হাজী মোদাচ্ছের ক্লথ স্টোর</span>
+            <span class="store-brand-line"></span>
+        </div>
+        <div class="login-card">
+            <h2>হাজী মোদাচ্ছের ক্লথ স্টোর</h2>
+            <p>সফটওয়্যার অ্যাক্সেস করতে লগইন করুন</p>
+            <div class="card-divider"></div>
+            <div class="role-selector">
+                <div class="role-tab active" id="tab-user" onclick="setRole('user')">👤 ইউজার</div>
+                <div class="role-tab" id="tab-admin" onclick="setRole('admin')">🔑 অ্যাডমিন</div>
+            </div>
+            <input type="password" id="pass-input" placeholder="পিন কোড লিখুন" maxlength="10">
+            <button class="login-btn" onclick="checkPass()">প্রবেশ করুন</button>
+            <p id="login-error" style="color:#ff5252; font-size:13px; margin-top:10px; display:none;">❌ ভুল পিন! আবার চেষ্টা করুন।</p>
+        </div>
+    </div>
+    <div id="print-area" style="display:none;"></div>
+    <div class="app-container" id="main-app" style="display:none;">
+        <div class="header">
+            <h1>হাজী মোদাচ্ছের ক্লথ স্টোর</h1>
+            <p>সন্দীপ কমপ্লেক্স, চট্টগ্রাম | ০১৭০৯-৩৪২০১৮ &nbsp;|&nbsp; <span id="logged-user-name" style="color:#ffd600; font-weight:bold;"></span> &nbsp;<button onclick="logoutUser()" style="background:rgba(255,255,255,0.15);color:white;border:1px solid rgba(255,255,255,0.3);padding:2px 10px;border-radius:6px;cursor:pointer;font-size:12px;">লগআউট</button></p>
+        </div>
+        <div class="status-bar admin-only">
+            <div class="status-box">আজকের মেমো সংখ্যা<span id="stat-memo">০</span></div>
+            <div class="status-box">আজকের মোট জমা<span id="stat-today">০/-</span></div>
+        </div>
+        <div class="left-panel">
+            <div style="display: grid; grid-template-columns: 1.5fr 1fr; gap: 10px; margin-bottom: 12px;">
+                <div class="p-name-wrap" style="position:relative;">
+                    <input type="text" id="cust-name" placeholder="ক্রেতার নাম (বাকি খাতা থেকে)"
+                        oninput="searchCreditCustomer(this.value)"
+                        onblur="setTimeout(closeCreditDropdown,400)"
+                        autocomplete="off">
+                </div>
+                <input type="text" id="cust-phone" placeholder="মোবাইল নম্বর">
+            </div>
+            <div style="font-weight: bold; color: var(--blue); font-size: 16px;" class="admin-only">রশিদ নং: <span
+                    id="next-invoice-id">...</span></div>
+            <div class="barcode-scanner-box"> <input type="text" id="barcode-input" placeholder="বারকোড স্ক্যান করুন..."
+                    style="background: white; font-weight: bold; border-color: var(--blue);"
+                    onkeydown="handleBarcodeScan(event)"> <button onclick="toggleCamera()"
+                    style="background: var(--blue); color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; white-space: nowrap;">📷
+                    ক্যামেরা</button> </div>
+            <div id="reader"></div>
+            <div class="table-header">
+                <div>পণ্যের নাম</div>
+                <div>পরিমাণ</div>
+                <div>মূল্য</div>
+                <div>×</div>
+            </div>
+            <div id="product-list-container"></div>
+            <div style="display: flex; gap: 10px;"> <button class="btn-add" onclick="addNewItemRow()">+ নতুন পণ্য
+                    (F2)</button> <button class="btn-return" onclick="addReturnItemRow()">+ মাল ফেরত (F4)</button> </div>
+            <div class="calc-section">
+                <div class="calc-row"><label>মোট বিল:</label><input type="text" id="sub-total" readonly></div>
+                <div class="calc-row"> <label>ছাড়ের ধরন:</label> <select id="disc-type" onchange="calculate()">
+                        <option value="fixed">টাকা (-)</option>
+                        <option value="percent">পার্সেন্ট (%)</option>
+                    </select> </div>
+                <div class="calc-row"><label>ছাড়ের পরিমাণ:</label><input type="text" id="disc-val" placeholder="পরিমাণ"
+                        oninput="calculate()"></div>
+                <div class="calc-row" style="border-top: 1px solid #546e7a; padding-top: 10px;"><label>টাকা জমা:</label><input
+                        type="text" id="paid-amt" placeholder="জমা" oninput="calculate()"
+                        style="background: #e8f5e9;"></div>
+                <div class="calc-row"><label>বাকি:</label><input type="text" id="due-amt" readonly
+                        style="background: #ffebee; color: var(--red);"></div>
+                <div class="final-total" id="grand-display">সর্বমোট: ০/-</div>
+            </div> <button class="btn-main" id="btn-save-request" onclick="sendInvoiceRequest()">অনুমোদনের জন্য পাঠান
+                (Enter)</button>
+        </div>
+        <div class="right-panel">
+            <div class="mgmt-box admin-only">
+                <h4 class="mgmt-title">ম্যানেজমেন্ট প্যানেল</h4>
+                <div id="dynamic-link-container" class="link-btn-container"></div>
+                <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:8px;">
+                    <button class="mgmt-action-btn" onclick="openMgmtModal()">➕ লিঙ্ক অ্যাড / ডিলিট</button>
+                    <button class="mgmt-action-btn" onclick="openUserModal()" style="background:#1b5e20; color:white;">👤 ইউজার ম্যানেজমেন্ট</button>
+                    <button class="mgmt-action-btn" onclick="openSalesReport()" style="background:#1a237e; color:white;">📊 বিক্রয় রিপোর্ট</button>
+                </div>
+            </div>
+            <div class="admin-only pending-box">
+                <h4 style="margin:0 0 10px 0; color:#f57f17;">নতুন মেমো রিকোয়েস্ট</h4>
+                <div id="pending-requests-list">কোন রিকোয়েস্ট নেই।</div>
+            </div>
+            <div class="tool-box admin-only">
+                <h4 style="margin-top:0;">মেমো সার্চ</h4>
+                <div style="display: flex; gap: 5px;"> <input type="text" id="search-id" placeholder="রশিদ নম্বর">
+                    <button onclick="searchMemo()"
+                        style="background:var(--blue); color:white; border:none; padding:0 15px; border-radius:6px; cursor:pointer;">খুঁজুন</button>
+                </div>
+            </div>
+            <div class="tool-box admin-only" style="background: #fff9c4; border-color: #fbc02d;">
+                <h4 style="color: #f57f17; margin-top:0;">তারিখ অনুযায়ী রিপোর্ট</h4> <input type="date"
+                    id="report-date" onchange="showDailyReport()">
+                <div id="report-result" style="font-weight: bold; margin-top:10px; color: #d84315;">তারিখ সিলেক্ট
+                    করুন...</div>
+                <div id="report-list" style="max-height: 150px; overflow-y: auto; margin-top: 10px; font-size: 13px;">
+                </div>
+            </div>
+            <div id="memo-preview" class="admin-only"
+                style="background: white; border: 1px solid #ccc; padding: 12px; min-height: 250px; border-radius: 8px; box-shadow: inset 0 0 10px rgba(0,0,0,0.02);">
+                মেমো প্রিভিউ...</div>
+            <button id="re-print-btn" onclick="directPrintFromPreview()"
+                style="width:100%; padding:12px; margin-top:10px; display:none; background:var(--blue); color:white; border:none; border-radius:8px; cursor:pointer; font-weight:bold;">আবার
+                প্রিন্ট করুন</button>
+            <button id="cancel-memo-btn" onclick="cancelCurrentMemo()"
+                style="width:100%; padding:10px; margin-top:6px; display:none; background:var(--red); color:white; border:none; border-radius:8px; cursor:pointer; font-weight:bold;">❌ মেমো বাতিল (স্টক ফেরত + মুছে যাবে)</button>
+            <button id="edit-memo-btn" onclick="editCurrentMemo()"
+                style="width:100%; padding:10px; margin-top:6px; display:none; background:#f57f17; color:white; border:none; border-radius:8px; cursor:pointer; font-weight:bold;">✏️ মেমো এডিট</button>
+        </div>
+    </div>
+    <div id="mgmt-modal">
+        <div class="mgmt-modal-content">
+            <h4 style="margin-top:0;">লিঙ্ক ম্যানেজমেন্ট</h4> <input type="text" id="new-link-name"
+                placeholder="নাম (উদা: ফেসবুক)" style="margin-bottom:10px;"> <input type="text" id="new-link-url"
+                placeholder="লিঙ্ক (https://...)" style="margin-bottom:10px;"> <button onclick="saveNewLink()"
+                class="btn-main" style="margin-top:0; padding:10px; background:var(--green);">অ্যাড করুন</button>
+            <div id="mgmt-items-list" style="margin-top:15px; max-height:200px; overflow-y:auto; border-top:1px solid #eee;">
+            </div> <button onclick="closeMgmtModal()" class="btn-main"
+                style="background:var(--red); padding:10px;">বন্ধ করুন</button>
+        </div>
+    </div>
+    <!-- User Management Modal -->
+    <div id="user-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:9999; align-items:center; justify-content:center;">
+        <div style="background:white; border-radius:16px; padding:28px; width:420px; max-width:95vw; max-height:90vh; overflow-y:auto; box-shadow:0 20px 60px rgba(0,0,0,0.4);">
+            <h4 style="margin-top:0; color:#1b5e20;">👤 ইউজার ম্যানেজমেন্ট</h4>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px;">
+                <input type="text" id="new-user-name" placeholder="ইউজারের নাম (যেমন: আরিফ)" style="padding:10px; border:1px solid #ccc; border-radius:8px;">
+                <input type="password" id="new-user-pin" placeholder="পিন কোড" style="padding:10px; border:1px solid #ccc; border-radius:8px;" maxlength="10">
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:15px;">
+                <select id="new-user-role" style="padding:10px; border:1px solid #ccc; border-radius:8px;">
+                    <option value="user">👤 ইউজার</option>
+                    <option value="admin">🔑 অ্যাডমিন</option>
+                </select>
+                <button onclick="addUser()" style="background:#1b5e20; color:white; border:none; border-radius:8px; cursor:pointer; font-weight:bold;">➕ ইউজার যোগ করুন</button>
+            </div>
+            <hr>
+            <h5 style="color:#263238; margin-bottom:10px;">বর্তমান ইউজার তালিকা:</h5>
+            <div id="user-list" style="max-height:280px; overflow-y:auto;"></div>
+            <hr>
+            <h5 style="color:#263238;">অ্যাডমিন পিন পরিবর্তন:</h5>
+            <div style="display:flex; gap:10px;">
+                <input type="password" id="new-admin-pin" placeholder="নতুন অ্যাডমিন পিন" style="flex:1; padding:10px; border:1px solid #ccc; border-radius:8px;" maxlength="10">
+                <button onclick="changeAdminPin()" style="background:#b71c1c; color:white; border:none; padding:10px 14px; border-radius:8px; cursor:pointer; font-weight:bold;">পরিবর্তন করুন</button>
+            </div>
+            <button onclick="closeUserModal()" style="width:100%; margin-top:15px; padding:12px; background:#d32f2f; color:white; border:none; border-radius:8px; cursor:pointer; font-weight:bold;">বন্ধ করুন</button>
+        </div>
+    </div>
+
+    <!-- Sales Report Modal -->
+    <div id="sales-report-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:9999; align-items:center; justify-content:center;">
+        <div style="background:white; border-radius:16px; padding:28px; width:550px; max-width:95vw; max-height:90vh; overflow-y:auto; box-shadow:0 20px 60px rgba(0,0,0,0.4);">
+            <h4 style="margin-top:0; color:#1a237e;">📊 বিক্রয় রিপোর্ট (বিক্রেতা অনুযায়ী)</h4>
+            <div style="display:flex; gap:8px; margin-bottom:15px; flex-wrap:wrap;">
+                <select id="sr-period" onchange="loadSalesReport()" style="padding:8px 12px; border:1px solid #ccc; border-radius:8px; flex:1;">
+                    <option value="daily">আজকের রিপোর্ট</option>
+                    <option value="monthly">এই মাসের রিপোর্ট</option>
+                    <option value="yearly">এই বছরের রিপোর্ট</option>
+                    <option value="custom">কাস্টম তারিখ</option>
+                </select>
+                <input type="date" id="sr-from" style="padding:8px; border:1px solid #ccc; border-radius:8px; display:none;" onchange="loadSalesReport()">
+                <input type="date" id="sr-to" style="padding:8px; border:1px solid #ccc; border-radius:8px; display:none;" onchange="loadSalesReport()">
+            </div>
+            <div id="sr-result" style="min-height:150px;"></div>
+            <button onclick="closeSalesReport()" style="width:100%; margin-top:15px; padding:12px; background:#d32f2f; color:white; border:none; border-radius:8px; cursor:pointer; font-weight:bold;">বন্ধ করুন</button>
+        </div>
+    </div>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyB-4NWcWQgw5vkAnq8r1gZKzM-nS53hIeQ",
+            authDomain: "haji-cloth-store.firebaseapp.com",
+            databaseURL: "https://haji-cloth-store-default-rtdb.firebaseio.com",
+            projectId: "haji-cloth-store",
+            storageBucket: "haji-cloth-store.firebasestorage.app",
+            messagingSenderId: "944010988937",
+            appId: "1:944010988937:web:3e5339759862691312a558"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+        let allInvoices = [],
+            isAdmin = false,
+            currentRequestKey = null;
+        let currentUser = { name: '', pin: '', role: 'user' }; // লগইন হওয়া ইউজার
+        let _allUsers = {}; // Firebase থেকে লোড হওয়া সব ইউজার
+        let html5QrCode = null;
+        /* ═══════════════════════════════════════ Backup System (Updated) ═══════════════════════════════════════ */
+        const SHEET_URL = "https://script.google.com/macros/s/AKfycbwv6fWSguLWk4h1p-BnbZDyiZnJ05gJGeDLk2-EpjcCEsY_geMw2JlTjARWn98YZkBWaw/exec";
+        const BK_PENDING = "hmc_pos_pending";
+
+        function bkSet(type, ico, title, desc, bdg) {
+            const bar = document.getElementById('bkBar');
+            bar.className = 'bk-bar ' + (type || '');
+            document.getElementById('bkIco').textContent = ico;
+            document.getElementById('bkTitle').textContent = title;
+            document.getElementById('bkDesc').textContent = desc;
+            document.getElementById('bkBdg').textContent = bdg;
+        }
+
+        function bkToast(type, ico, title, desc) {
+            const c = document.getElementById('bk-toasts');
+            const t = document.createElement('div');
+            t.className = 'bk-toast ' + (type || '');
+            t.innerHTML = `<div class="bk-ti">${ico}</div><div class="bk-tb"><h6>${title}</h6><p>${desc}</p></div>`;
+            c.appendChild(t);
+            setTimeout(() => {
+                t.style.animation = 'tkOut 0.4s forwards';
+                setTimeout(() => t.remove(), 400);
+            }, 3000);
+        }
+
+        function bkSend(type, data, retry = 0) {
+            fetch(SHEET_URL, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        type,
+                        data
+                    })
+                })
+                .then(r => r.json())
+                .then(res => {
+                    if (res.status === 'ok') {
+                        const now = new Date().toLocaleString('bn-BD', {
+                            timeZone: 'Asia/Dhaka'
+                        });
+                        bkSet('', '☁️', 'ব্যাকআপ সিস্টেম সক্রিয়', 'সর্বশেষ: মেমো #' + (data.id || '') + ' — ' + now, 'সফল ✓');
+                        bkToast('', '✅', 'ব্যাকআপ সম্পন্ন', 'মেমো #' + (data.id || '') + ' Sheet-এ সেভ হয়েছে');
+                        bkSendPending();
+                    } else throw new Error('err');
+                })
+                .catch(() => {
+                    if (retry < 2) {
+                        bkSet('error', '⚠️', 'Retry করছে...', (retry + 1) + ' নম্বর চেষ্টা হচ্ছে...', 'Retry...');
+                        setTimeout(() => bkSend(type, data, retry + 1), 30000);
+                    } else {
+                        const p = JSON.parse(localStorage.getItem(BK_PENDING) || '[]');
+                        p.push({
+                            type,
+                            data,
+                            time: Date.now()
+                        });
+                        localStorage.setItem(BK_PENDING, JSON.stringify(p));
+                        bkSet('pending', '📦', 'Pending ব্যাকআপ আছে', 'Internet আসলে automatically পাঠাবে', 'Pending');
+                        bkToast('error', '⚠️', 'ব্যাকআপ Pending', 'Internet আসলে automatically পাঠানো হবে');
+                    }
+                });
+        }
+
+        // ══ Credit book: dropdown থেকে বাছাই করা customer-এর Firebase key ══
+        // সরাসরি key ব্যবহার করলে makeCustKey() mismatch এর কোনো সুযোগ নেই
+        let _selectedCustKey = null;
+
+        let _bkSending = false; // race condition guard
+        function bkSendPending() {
+            if (_bkSending) return; // ইতিমধ্যে চলছে
+            const p = JSON.parse(localStorage.getItem(BK_PENDING) || '[]');
+            if (!p.length) return;
+            _bkSending = true;
+            let done = 0, successCount = 0;
+            p.forEach((item, i) => {
+                setTimeout(() => {
+                    fetch(SHEET_URL, {
+                            method: 'POST',
+                            body: JSON.stringify({ type: item.type, data: item.data })
+                        })
+                        .then(r => r.json()).then(res => {
+                            if (res.status === 'ok') {
+                                successCount++;
+                                const rem = JSON.parse(localStorage.getItem(BK_PENDING) || '[]').filter(x => x.time !== item.time);
+                                localStorage.setItem(BK_PENDING, JSON.stringify(rem));
+                            }
+                        }).catch(() => {}).finally(() => {
+                            done++;
+                            if (done >= p.length) {
+                                _bkSending = false;
+                                const remaining = JSON.parse(localStorage.getItem(BK_PENDING) || '[]');
+                                if (!remaining.length) {
+                                    // সব পাঠানো সফল — bkBar "প্রস্তুত" করো
+                                    bkSet('', '☁️', 'ব্যাকআপ সিস্টেম সক্রিয়', 'সব Pending ব্যাকআপ সম্পন্ন', 'প্রস্তুত ✓');
+                                    bkToast('', '✅', 'সব Pending ব্যাকআপ সম্পন্ন', 'সব ডেটা Sheet-এ সেভ হয়েছে');
+                                }
+                            }
+                        });
+                }, i * 2000);
+            });
+        }
+        // online হলে pending backup পাঠানো updateOnlineStatus() থেকেই হয়
+        async function bkDeleteOld() {
+            try {
+                const res = await fetch(`${SHEET_URL}?type=old_invoice_ids`);
+                const json = await res.json();
+                const ids = json.data || [];
+                if (!ids.length) return;
+                for (const id of ids) await db.ref('invoices/' + id).remove();
+                bkToast('', '🗑️', 'পুরনো মেমো পরিষ্কার', ids.length + 'টি পুরনো মেমো Firebase থেকে সরানো হয়েছে');
+            } catch (e) {
+                console.log('bkDeleteOld:', e);
+            }
+        }
+        /* ═══════════════════════════════════════ Functions ═══════════════════════════════════════ */
+        let _mgmtLinksListenerActive = false;
+        function initMgmtLinks() {
+            if (!_mgmtLinksListenerActive) {
+                _mgmtLinksListenerActive = true;
+                db.ref('management_links').on('value', snap => {
+                    const data = snap.val();
+                    const container = document.getElementById('dynamic-link-container');
+                    const list = document.getElementById('mgmt-items-list');
+                    container.innerHTML = "";
+                    list.innerHTML = "";
+                    if (data) {
+                        Object.keys(data).forEach(key => {
+                            const item = data[key];
+                            const a = document.createElement('a');
+                            a.href = item.url;
+                            a.target = "_blank";
+                            a.className = "dynamic-link-btn";
+                            a.innerText = item.name;
+                            container.appendChild(a);
+                            const div = document.createElement('div');
+                            div.className = "mgmt-list-item";
+                            div.innerHTML = `<span>${item.name}</span><button class="del-x" onclick="deleteLink('${key}')">×</button>`;
+                            list.appendChild(div);
+                        });
+                    }
+                });
+            }
+        }
+
+        function openMgmtModal() {
+            document.getElementById('mgmt-modal').style.display = 'flex';
+        }
+
+        function closeMgmtModal() {
+            document.getElementById('mgmt-modal').style.display = 'none';
+        }
+
+        function saveNewLink() {
+            const name = document.getElementById('new-link-name').value.trim();
+            let url = document.getElementById('new-link-url').value.trim();
+            if (!name || !url) return alert("দয়া করে নাম ও লিঙ্ক উভয়ই দিন");
+            if (!url.startsWith('http')) url = 'https://' + url;
+            db.ref('management_links').push({
+                name,
+                url
+            }).then(() => {
+                document.getElementById('new-link-name').value = "";
+                document.getElementById('new-link-url').value = "";
+            });
+        }
+
+        function deleteLink(key) {
+            if (confirm("ডিলিট করবেন?")) db.ref('management_links/' + key).remove();
+        }
+
+        const getToday = () => new Intl.DateTimeFormat('en-CA', {
+            timeZone: 'Asia/Dhaka'
+        }).format(new Date());
+
+        let selectedRole = 'user';
+
+        function setRole(role) {
+            selectedRole = role;
+            document.getElementById('tab-user').classList.toggle('active', role === 'user');
+            document.getElementById('tab-admin').classList.toggle('active', role === 'admin');
+            document.getElementById('pass-input').focus();
+        }
+
+        // Firebase থেকে সব ইউজার লোড করে রাখো
+        function loadUsers(cb) {
+            db.ref('pos_users').once('value', snap => {
+                _allUsers = snap.val() || {};
+                if (cb) cb();
+            });
+        }
+
+        // Login screen init — ইউজার লোড করো, না থাকলে default admin তৈরি করো
+        loadUsers(() => {
+            if (!Object.keys(_allUsers).length) {
+                db.ref('pos_users').push({
+                    name: 'অ্যাডমিন',
+                    pin: '2255',
+                    role: 'admin',
+                    createdAt: Date.now()
+                });
+            }
+        });
+
+        function checkPass() {
+            const pin = document.getElementById('pass-input').value.trim();
+            if (!pin) return;
+            const errEl = document.getElementById('login-error');
+            errEl.style.display = 'none';
+
+            // _allUsers খালি থাকলে আবার লোড করে চেক করো
+            if (!Object.keys(_allUsers).length) {
+                loadUsers(() => _doCheckPass(pin, errEl));
+            } else {
+                _doCheckPass(pin, errEl);
+            }
+        }
+
+        function _doCheckPass(pin, errEl) {
+            let matched = null;
+            for (const key in _allUsers) {
+                const u = _allUsers[key];
+                const uRole = u.role || 'user';
+                if (String(u.pin) === String(pin) && uRole === selectedRole) {
+                    matched = { ...u, key };
+                    break;
+                }
+            }
+
+            if (matched) {
+                currentUser = { name: matched.name, pin: matched.pin, role: matched.role || 'user', key: matched.key };
+                isAdmin = (currentUser.role === 'admin');
+                enterApp();
+            } else {
+                errEl.style.display = 'block';
+                document.getElementById('pass-input').value = '';
+                document.getElementById('pass-input').focus();
+            }
+        }
+
+        let _firebaseListenersActive = false; // listeners একবারই attach হবে
+
+        /* ══ CREDIT BOOK path — logoutUser-এ CB দরকার তাই আগে declare ══ */
+        const CB = 'credit_ledger';
+
+        function logoutUser() {
+            if (!confirm('লগআউট করবেন?')) return;
+            // এডিট মোডে logout হলে counter পুনরুদ্ধার করো
+            if (_editRestoreCounter !== null && _editingOldInvoice) {
+                db.ref('invoice_counter').set(_editRestoreCounter);
+            }
+            // সব Firebase realtime listener detach করো
+            db.ref('invoices').off();
+            db.ref('invoice_counter').off();
+            db.ref('pending_requests').off();
+            db.ref('management_links').off();
+            db.ref('inventory').off();
+            db.ref(`${CB}/customers`).off();
+            // listener guard flag reset করো — পরের login-এ নতুন করে attach হবে
+            _firebaseListenersActive    = false;
+            _mgmtLinksListenerActive    = false;
+            _creditCacheListenerActive  = false;
+            _inventoryLiveListenerOn    = false; // inventory listener guard reset
+            _inventoryCache             = null;  // inventory cache clear
+            // edit state clear করো
+            _editingOldInvoice  = null;
+            _editRestoreCounter = null;
+            currentUser = { name: '', pin: '', role: 'user' };
+            isAdmin = false;
+            document.getElementById('main-app').style.display = 'none';
+            document.getElementById('bkBar').style.display = 'none';
+            document.getElementById('auth-overlay').style.display = 'flex';
+            document.getElementById('pass-input').value = '';
+            document.getElementById('login-error').style.display = 'none';
+            loadUsers(); // fresh reload
+        }
+
+        function enterApp() {
+            document.getElementById('auth-overlay').style.display = 'none';
+            document.getElementById('main-app').style.display = 'grid';
+            document.getElementById('bkBar').style.display = 'flex';
+            document.querySelectorAll('.admin-only').forEach(el => {
+                if (!isAdmin) { el.style.display = 'none'; return; }
+                el.style.display = el.classList.contains('status-bar') ? 'grid' : 'block';
+            });
+            document.getElementById('btn-save-request').innerText = isAdmin ? "সরাসরি সেভ ও প্রিন্ট (Enter)" : "অনুমোদনের জন্য পাঠান (Enter)";
+            // Header-এ user name দেখাও
+            const role = isAdmin ? '🔑 অ্যাডমিন' : '👤 ইউজার';
+            document.getElementById('logged-user-name').textContent = `${role}: ${currentUser.name}`;
+            initApp();
+            initMgmtLinks();
+            initCreditCustomerCache();
+            setTimeout(bkSendPending, 3000);
+            if (isAdmin) setTimeout(bkDeleteOld, 5000);
+        }
+
+        function initApp() {
+            const today = getToday();
+            document.getElementById('report-date').value = today;
+
+            // ── Multiple listener guard — re-login এ দ্বিগুণ হওয়া ঠেকাও ──
+            if (!_firebaseListenersActive) {
+                _firebaseListenersActive = true;
+
+                db.ref('invoices').on('value', snap => {
+                    const data = snap.val();
+                    allInvoices = data ? Object.values(data).sort((a, b) => {
+                        if (a.date < b.date) return -1;
+                        if (a.date > b.date) return 1;
+                        return (a.id || 0) - (b.id || 0);
+                    }) : [];
+                    updateDashboard();
+                });
+
+                db.ref('invoice_counter').on('value', snap => {
+                    document.getElementById('next-invoice-id').innerText = (snap.val() || 1000) + 1;
+                });
+
+                db.ref('pending_requests').on('value', snap => {
+                    if (isAdmin) {
+                        const requests = snap.val();
+                        const listEl = document.getElementById('pending-requests-list');
+                        if (!requests) {
+                            listEl.innerHTML = "কোন রিকোয়েস্ট নেই।";
+                            return;
+                        }
+                        listEl.innerHTML = Object.keys(requests).map(key => {
+                            const req = requests[key];
+                            return `<div style="background:white; padding:8px; border-radius:5px; margin-bottom:5px; border:1px solid #ddd; font-size:13px;"> <b>#${req.id}</b> - ${req.name} (${req.total}/-) <div style="margin-top:5px;"> <button onclick="loadRequestForEdit('${key}')" style="background:var(--blue); color:white; border:none; padding:3px 8px; cursor:pointer; border-radius:3px;">এডিট ও অনুমোদন</button> <button onclick="rejectRequest('${key}')" style="background:var(--red); color:white; border:none; padding:3px 8px; cursor:pointer; border-radius:3px;">বাতিল</button> </div> </div>`;
+                        }).join('');
+                    }
+                });
+            }
+
+            if (document.getElementById('product-list-container').innerHTML === "") resetForm();
+        }
+
+        function handleBarcodeScan(e) {
+            if (e.key === "Enter") {
+                e.preventDefault(); // window.onkeydown → sendInvoiceRequest bubble ঠেকাও
+                const code = e.target.value.trim();
+                if (code) findProductByBarcode(code);
+                e.target.value = "";
+            }
+        }
+
+        function toggleCamera() {
+            const reader = document.getElementById('reader');
+            if (reader.style.display === 'none' || reader.style.display === '') {
+                reader.style.display = 'block';
+                startScanner();
+            } else {
+                stopScanner();
+                reader.style.display = 'none';
+            }
+        }
+
+        function startScanner() {
+            html5QrCode = new Html5Qrcode("reader");
+            html5QrCode.start({
+                facingMode: "environment"
+            }, {
+                fps: 10,
+                qrbox: {
+                    width: 250,
+                    height: 150
+                }
+            }, (decodedText) => {
+                findProductByBarcode(decodedText);
+                stopScanner();
+                document.getElementById('reader').style.display = 'none';
+            }, () => {}).catch(() => alert("ক্যামেরা ওপেন করা যাচ্ছে না!"));
+        }
+
+        function stopScanner() {
+            if (html5QrCode) {
+                html5QrCode.stop().then(() => html5QrCode.clear());
+            }
+        }
+
+        function findProductByBarcode(code) {
+            getInventoryCache(inventory => {
+                let product = null;
+                if (inventory) {
+                    const codeLower = code.toLowerCase();
+                    for (let key in inventory) {
+                        const item = inventory[key];
+                        if ((item.barcode && item.barcode.toLowerCase() === codeLower) || (item.name && item.name.toLowerCase() === codeLower) || (item.serial && item.serial.toLowerCase() === codeLower)) {
+                            product = { ...item };
+                            product.sID = item.serial || key;
+                            break;
+                        }
+                    }
+                }
+                if (product) {
+                    const fullNameWithId = product.name + " (" + product.sID + ")";
+                    const emptyReturnRow = Array.from(document.querySelectorAll('.item-row')).find(r => r.querySelector('.p-name').value === "মাল ফেরত" && r.querySelector('.p-price').value === "");
+                    if (emptyReturnRow) {
+                        emptyReturnRow.querySelector('.p-price').value = product.price || "";
+                        emptyReturnRow.querySelector('.p-name').value = "মাল ফেরত: " + fullNameWithId;
+                        emptyReturnRow.dataset.sid = product.sID;
+                    } else {
+                        const lastRow = document.querySelector('#product-list-container .item-row:last-child');
+                        if (lastRow && lastRow.querySelector('.p-name').value === "") {
+                            lastRow.querySelector('.p-name').value = fullNameWithId;
+                            lastRow.querySelector('.p-price').value = product.price || "";
+                            lastRow.dataset.sid = product.sID;
+                        } else {
+                            addNewItemRow(fullNameWithId, 1, product.price || "", product.sID);
+                        }
+                    }
+                    calculate();
+                    document.getElementById('barcode-input').focus();
+                } else {
+                    alert("এই বারকোডের কোনো পণ্য পাওয়া যায়নি!");
+                }
+            });
+        }
+
+        function getNextInvoiceID(callback) {
+            db.ref('invoice_counter').transaction(currentValue => (currentValue || 1000) + 1, (error, committed, snapshot) => {
+                if (committed) callback(snapshot.val());
+                else alert("আইডি জেনারেট করতে সমস্যা হয়েছে।");
+            });
+        }
+
+        function addNewItemRow(pName = "", pQty = 1, pPrice = "", sID = "") {
+            const rowId = 'row-' + Date.now() + Math.random().toString(36).substr(2, 5);
+            const row = document.createElement('div');
+            row.className = 'item-row';
+            row.id = rowId;
+            if (sID) row.dataset.sid = sID;
+            row.innerHTML = `
+                <div class="p-name-wrap">
+                    <input type="text" class="p-name" value="${pName}" placeholder="পণ্যের নাম বা সিরিয়াল"
+                        onkeydown="handleSearchKey(event, '${rowId}')"
+                        oninput="searchProduct(event, '${rowId}')"
+                        autocomplete="off">
+                </div>
+                <input type="number" class="p-qty" value="${pQty}" min="1" oninput="calculate()" onkeydown="handleQtyKey(event, '${rowId}')">
+                <input type="number" class="p-price" value="${pPrice}" placeholder="মূল্য" oninput="calculate()" onkeydown="handlePriceKey(event, '${rowId}')">
+                <button style="color:var(--red); border:none; background:none; cursor:pointer; font-size:20px;" onclick="this.closest('.item-row').remove(); calculate();">×</button>`;
+            document.getElementById('product-list-container').appendChild(row);
+            if (!pName) row.querySelector('.p-name').focus();
+        }
+
+        function addReturnItemRow(pQty = 1, pPrice = "", sID = "") {
+            const rowId = 'row-' + Date.now() + Math.random().toString(36).substr(2, 5);
+            const row = document.createElement('div');
+            row.className = 'item-row';
+            row.id = rowId;
+            row.style.background = "#ffebee";
+            if (sID) row.dataset.sid = sID;
+            row.innerHTML = `
+                <div class="p-name-wrap">
+                    <input type="text" class="p-name return-mark" value="মাল ফেরত"
+                        onkeydown="handleSearchKey(event, '${rowId}')"
+                        style="color:var(--red); font-weight:bold;" readonly>
+                </div>
+                <input type="number" class="p-qty" value="${pQty}" min="1" oninput="calculate()" onkeydown="handleQtyKey(event, '${rowId}')">
+                <input type="number" class="p-price" value="${pPrice}" placeholder="ফেরত মূল্য" oninput="calculate()" onkeydown="handlePriceKey(event, '${rowId}')" style="color:var(--red); font-weight:bold;">
+                <button style="color:var(--red); border:none; background:none; cursor:pointer; font-size:20px;" onclick="this.closest('.item-row').remove(); calculate();">×</button>`;
+            document.getElementById('product-list-container').appendChild(row);
+            if (!pPrice) row.querySelector('.p-price').focus();
+        }
+
+        function handleSearchKey(e, rowId) {
+            if (e.key === "Enter") document.querySelector(`#${rowId} .p-qty`).focus();
+        }
+
+        function handleQtyKey(e, rowId) {
+            if (e.key === "Enter") document.querySelector(`#${rowId} .p-price`).focus();
+        }
+
+        function handlePriceKey(e, rowId) {
+            if (e.key === "Enter") {
+                e.preventDefault(); // bubble ঠেকাও — window.onkeydown → sendInvoiceRequest হবে না
+                addNewItemRow();
+            }
+        }
+
+        function calculate() {
+            let sub = 0;
+            document.querySelectorAll('.item-row').forEach(r => {
+                const qty = parseFloat(r.querySelector('.p-qty').value) || 0;
+                const price = parseFloat(r.querySelector('.p-price').value) || 0;
+                const isReturn = r.querySelector('.p-name').value.includes("মাল ফেরত");
+                sub += isReturn ? -(qty * price) : (qty * price);
+            });
+            document.getElementById('sub-total').value = Math.round(sub);
+            let dType = document.getElementById('disc-type').value;
+            let dVal  = parseFloat(document.getElementById('disc-val').value) || 0;
+            let discAmt = dType === "percent" ? (sub * dVal / 100) : dVal;
+            let grand = sub - discAmt;
+            if (grand < 0) grand = 0; // ছাড় subtotal-এর বেশি হলে ০ করো
+            let paid = parseFloat(document.getElementById('paid-amt').value) || 0;
+            // FIX: paid > grand হলে due নেগেটিভ হওয়া ঠেকাও
+            if (paid > grand) paid = grand;
+            let due = Math.max(0, grand - paid);
+            document.getElementById('due-amt').value  = Math.round(due);
+            document.getElementById('grand-display').innerText = "সর্বমোট: " + Math.round(grand) + "/-";
+            return { sub, grand, discAmt, paid, due };
+        }
+
+        function reduceStock(sID, qty, isReturn) {
+            if (!sID) return;
+            const numQty = parseFloat(qty) || 0;
+            db.ref('inventory/' + sID + '/qty').transaction(currentQty => {
+                let current = parseFloat(currentQty) || 0;
+                let updated = isReturn ? (current + numQty) : (current - numQty);
+                return updated >= 0 ? updated : 0;
+            }).then(() => {
+                // inventory_updates/ তে timestamp লিখো — inventory খাতা এটা দেখে auto-sync করবে
+                db.ref('inventory_updates/' + sID).set(Date.now());
+            });
+        }
+
+        function sendInvoiceRequest() {
+            let { sub, grand, discAmt, paid, due } = calculate();
+            if (sub === 0) return alert("পণ্য ও সঠিক মূল্য দিন!");
+            if (sub < 0) return alert("শুধু মাল ফেরত দিয়ে ইনভয়েস করা যাবে না! বিক্রয় পণ্য যোগ করুন।");
+
+            // ── Helper: form থেকে items সংগ্রহ করো ──
+            const collectItems = () => {
+                const items = [];
+                document.querySelectorAll('.item-row').forEach(r => {
+                    const sid = r.dataset.sid || "";
+                    items.push({
+                        id: sid, sid,
+                        name: r.querySelector('.p-name').value,
+                        qty: parseFloat(r.querySelector('.p-qty').value) || 0,   // FIX: parseFloat (আগে parseInt ছিল)
+                        price: parseFloat(r.querySelector('.p-price').value) || 0
+                    });
+                });
+                return items;
+            };
+
+            // ── Helper: invoice object তৈরি করো ──
+            const buildInvoice = (id, items, seller) => ({
+                id, date: getToday(),
+                name: document.getElementById('cust-name').value || "নগদ",
+                phone: document.getElementById('cust-phone').value || "",
+                subTotal: sub, discType: document.getElementById('disc-type').value,
+                discVal: document.getElementById('disc-val').value || "",
+                discAmt, paid, due, total: grand, items,
+                seller: seller || currentUser.name || 'অজানা'
+            });
+
+            // ── Helper: এডিট মোডে পুরনো স্টক ফেরত দাও ও মেমো ডিলিট করো ──
+            const applyEditCleanup = () => {
+                if (!_editingOldInvoice) return;
+                (_editingOldInvoice.items || []).forEach(item => {
+                    const sID = item.sid || item.id;
+                    if (!sID) return;
+                    const wasReturn = (item.name || '').includes("মাল ফেরত");
+                    db.ref('inventory/' + sID + '/qty').transaction(cur => {
+                        const c = parseFloat(cur) || 0;
+                        return wasReturn ? Math.max(0, c - item.qty) : c + item.qty;
+                    }).then(() => {
+                        db.ref('inventory_updates/' + sID).set(Date.now());
+                    });
+                });
+                const oldId = _editingOldInvoice.id;
+                db.ref('invoices/' + oldId).remove();
+                fetch(SHEET_URL, { method: 'POST', body: JSON.stringify({ type: 'delete_invoice', data: { id: oldId } }) }).catch(() => {});
+                allInvoices = allInvoices.filter(i => i.id != oldId);
+            };
+
+            // ════════════════════════════════════════════
+            // ── USER (non-admin): counter increment করো না ──
+            // ════════════════════════════════════════════
+            if (!isAdmin) {
+                const items = collectItems();
+                // Temp ID ব্যবহার করো — admin approve করলে আসল ID পাবে
+                const tempId = 'P' + Date.now();
+                const pendingData = buildInvoice(tempId, items, currentUser.name);
+                db.ref('pending_requests').push(pendingData);
+                // Apps Script-এ backup করো (pending handler আছে)
+                fetch(SHEET_URL, {
+                    method: 'POST',
+                    body: JSON.stringify({ type: 'pending', data: pendingData })
+                }).catch(() => {});
+                alert("✅ মেমোটি অনুমোদনের জন্য পাঠানো হয়েছে।\nঅ্যাডমিন অনুমোদন করলে মেমো নম্বর পাবেন।");
+                resetForm();
+                return;
+            }
+
+            // ════════════════════════════════════════════
+            // ── ADMIN: Pending request approve করো ──
+            // ════════════════════════════════════════════
+            if (currentRequestKey) {
+                // _pendingOriginalId temp (P...) হলে নতুন ID দরকার, নইলে পুরনো ID রাখো
+                const isTempId = !_pendingOriginalId || String(_pendingOriginalId).startsWith('P');
+
+                const doApprove = (finalId) => {
+                    const items = collectItems();
+                    const invoiceData = buildInvoice(finalId, items, _originalSeller || currentUser.name);
+                    db.ref('pending_requests/' + currentRequestKey).remove().then(() => {
+                        applyEditCleanup(); // এডিট মোডে পুরনো স্টক+মেমো সাফ করো
+                        items.forEach(item => reduceStock(item.id || item.sid, item.qty, item.name.includes("মাল ফেরত")));
+                        finalizeInvoice(invoiceData);
+                        currentRequestKey = null;
+                        _originalSeller   = null;
+                        _pendingOriginalId = null;
+                    });
+                };
+
+                if (isTempId) {
+                    // নতুন ID generate করো (user temp ID-র কারণে counter নষ্ট হয়নি)
+                    getNextInvoiceID(doApprove);
+                } else {
+                    // পুরনো real ID ব্যবহার করো
+                    doApprove(_pendingOriginalId);
+                }
+                return;
+            }
+
+            // ════════════════════════════════════════════
+            // ── ADMIN: সরাসরি সেভ (নতুন বা এডিট) ──
+            // ════════════════════════════════════════════
+            getNextInvoiceID((newId) => {
+                const items = collectItems();
+                const invoiceData = buildInvoice(newId, items, currentUser.name);
+                applyEditCleanup(); // এডিট মোডে: পুরনো স্টক ফেরত ও মেমো ডিলিট (save নিশ্চিত হওয়ার পর)
+                items.forEach(item => reduceStock(item.id || item.sid, item.qty, item.name.includes("মাল ফেরত")));
+                finalizeInvoice(invoiceData);
+            });
+        }
+
+        function _roundInvoice(data) {
+            // Firebase-এ store করার আগে সব monetary value integer করো
+            return {
+                ...data,
+                subTotal: Math.round(data.subTotal || 0),
+                discAmt:  Math.round(data.discAmt  || 0),
+                discVal:  parseFloat(data.discVal)  || 0,  // string → number
+                paid:     Math.round(data.paid      || 0),
+                due:      Math.round(data.due       || 0),
+                total:    Math.round(data.total     || 0),
+            };
+        }
+
+        function finalizeInvoice(rawData) {
+            const data = _roundInvoice(rawData);
+
+            // ══ custKey: dropdown থেকে বাছাই হলে সেটা, নইলে নাম থেকে তৈরি করো ══
+            // invoice-এ custKey সংরক্ষণ করো → cancelCurrentMemo সঠিক customer খুঁজে পাবে
+            const custKey = (parseFloat(data.due) > 0 && data.name !== "নগদ")
+                ? (_selectedCustKey || makeCustKey(data.name))
+                : null;
+            if (custKey) data.custKey = custKey;
+
+            let itemsHtml = data.items.map(item => {
+                const isReturn = item.name.includes("মাল ফেরত");
+                return `<tr style="${isReturn ? 'color:red;' : ''}"><td style="padding: 3px 0;">${item.name}</td><td align="center">${item.qty}</td><td align="right">${isReturn ? '-' : ''}${Math.round(item.qty * item.price)}/-</td></tr>`;
+            }).join('');
+            const bdFullTime = new Date().toLocaleString('bn-BD', {
+                timeZone: 'Asia/Dhaka'
+            });
+            const memoHtml = ` <div style="width:58mm; font-family: 'Arial', sans-serif; font-size:12px; padding:5px; background:white; color:#000;"> <center> <b style="font-size:18px;">হাজী মোদাচ্ছের ক্লথ স্টোর</b><br> <span style="font-size:11px;">সন্দীপ কমপ্লেক্স, চট্টগ্রাম<br>মোবাইল: ০১৭০৯-৩৪২০১৮</span><br> <div style="border-top:1px dashed #000; margin: 5px 0;"></div> </center> <table width="100%" style="font-size:11px; margin-bottom: 5px;"> <tr><td>রশিদ: <b>#${data.id}</b></td><td align="right">তারিখ: ${bdFullTime.split(',')[0]}</td></tr> <tr><td colspan="2">ক্রেতা: ${data.name} ${data.phone ? ' (' + data.phone + ')' : ''}</td></tr> <tr><td colspan="2" style="font-size:10px; color:#555;">বিক্রেতা: ${data.seller || currentUser.name || ''}</td></tr> </table> <table width="100%" style="font-size:11px; border-collapse: collapse;"> <tr style="border-bottom: 1px solid #000; font-weight: bold;"><td align="left">বিবরণ</td><td align="center">পরিমাণ</td><td align="right">মূল্য</td></tr> ${itemsHtml} </table> <div style="border-top:1px dashed #000; margin: 5px 0;"></div> <table width="100%" style="font-size:12px; font-weight: bold;"> <tr><td>মোট বিল:</td><td align="right">${Math.round(data.subTotal)}/-</td></tr> <tr><td>ছাড়:</td><td align="right">(-) ${Math.round(data.discAmt)}/-</td></tr> <tr style="font-size:14px;"><td>সর্বমোট:</td><td align="right">${Math.round(data.total)}/-</td></tr> <tr><td>জমা:</td><td align="right">${Math.round(data.paid || 0)}/-</td></tr> <tr style="color: ${data.due > 0 ? 'red' : 'black'};"><td>বাকি:</td><td align="right">${Math.round(data.due || 0)}/-</td></tr> </table> <div style="border-top:1px solid #000; margin: 8px 0 5px 0;"></div> <center> <p style="font-size:10px; margin: 3px 0;"><b>শর্তাবলী:</b></p> <ul style="font-size:9px; text-align: left; padding-left: 15px; margin: 0;"> <li>বিক্রিত পণ্য ৩ দিনের মধ্যে পরিবর্তনযোগ্য।</li> <li>ব্যবহৃত বা ধোয়া মাল ফেরত/পরিবর্তন হয় না।</li> </ul> <div class="qr-code-div" style="margin-top: 10px; display: flex; justify-content: center;"></div> <p style="font-size:10px; margin-top: 5px; font-weight: bold;">ধন্যবাদ, আবার আসবেন!</p> </center> </div>`;
+            db.ref('invoices/' + data.id).set({ ...data, html: memoHtml });
+            // ══ CREDIT BOOK SYNC ══
+            if (_editingOldInvoice) {
+                const oldDue = parseFloat(_editingOldInvoice.due) || 0;
+                const newDue = parseFloat(data.due) || 0;
+                const collected = Math.round(oldDue - newDue);
+                if (oldDue > 0 && collected > 0) {
+                    syncCreditPaymentFromEdit(_editingOldInvoice, data, collected);
+                } else if (oldDue <= 0 && newDue > 0) {
+                    addToCreditLedger(data);
+                }
+                _editingOldInvoice = null;
+            } else if (parseFloat(data.due) > 0) {
+                addToCreditLedger(data);
+            }
+            // এডিট মোডে save হলে counter আসল জায়গায় ফিরিয়ে দাও
+            if (_editRestoreCounter !== null) {
+                db.ref('invoice_counter').set(_editRestoreCounter);
+                _editRestoreCounter = null;
+            }
+            bkSet('saving', '⏳', 'ব্যাকআপ হচ্ছে...', 'মেমো #' + data.id + ' Sheet-এ যাচ্ছে', 'সেভ হচ্ছে...');
+            bkSend("invoice", { ...data, html: memoHtml });
+            currentPreviewInvoiceId = data.id;
+            printMemo(memoHtml, data.id);
+            resetForm();
+        }
+
+        function printMemo(html, id) {
+            const printDiv = document.getElementById('print-area');
+            printDiv.innerHTML = html;
+            printDiv.style.display = 'block';
+            const qrContainer = printDiv.querySelector('.qr-code-div');
+            if (qrContainer) {
+                qrContainer.innerHTML = "";
+                new QRCode(qrContainer, {
+                    text: "https://www.facebook.com/HaziModasserClothStore",
+                    width: 70,
+                    height: 70
+                });
+            }
+            setTimeout(() => {
+                window.print();
+                document.getElementById('memo-preview').innerHTML = html;
+                const previewQR = document.getElementById('memo-preview').querySelector('.qr-code-div');
+                if (previewQR) {
+                    previewQR.innerHTML = "";
+                    new QRCode(previewQR, {
+                        text: "https://www.facebook.com/HaziModasserClothStore",
+                        width: 70,
+                        height: 70
+                    });
+                }
+                if (isAdmin) document.getElementById('re-print-btn').style.display = "block";
+                if (isAdmin && currentPreviewInvoiceId !== null) {
+                    document.getElementById('cancel-memo-btn').style.display = 'block';
+                    document.getElementById('edit-memo-btn').style.display = 'block';
+                }
+                printDiv.style.display = 'none';
+            }, 600);
+        }
+
+        function resetForm() {
+            document.getElementById('cust-name').value = "";
+            document.getElementById('cust-phone').value = "";
+            document.getElementById('disc-val').value = "";
+            document.getElementById('paid-amt').value = "";
+            document.getElementById('due-amt').value = "";
+            document.getElementById('product-list-container').innerHTML = "";
+            document.getElementById('barcode-input').value = "";
+            // ── এডিট মোড বাতিল: counter পুনরুদ্ধার করো ──
+            if (_editRestoreCounter !== null && _editingOldInvoice) {
+                db.ref('invoice_counter').set(_editRestoreCounter);
+            }
+            // ── সব pending/edit state পরিষ্কার ──
+            currentRequestKey   = null;
+            _pendingOriginalId  = null;
+            _originalSeller     = null;
+            _editingOldInvoice  = null;
+            _editRestoreCounter = null;
+            _selectedCustKey    = null; // credit book customer selection reset
+            addNewItemRow();
+            calculate();
+        }
+        async function searchMemo() {
+            if (!isAdmin) return;
+            const searchId = document.getElementById('search-id').value.trim();
+            if (!searchId) return alert('রশিদ নম্বর লিখুন!');
+            let found = allInvoices.find(i => i.id == searchId);
+            if (found) {
+                showMemoPreview(found);
+                return;
+            }
+            document.getElementById('memo-preview').innerHTML = '<div style="padding:20px;text-align:center;color:#1e88e5;">⏳ পুরনো ব্যাকআপে খোঁজা হচ্ছে...</div>';
+            bkSet('reading', '📦', 'ব্যাকআপ থেকে খোঁজা হচ্ছে...', 'মেমো #' + searchId + ' Sheet-এ খোঁজা হচ্ছে', 'খোঁজা হচ্ছে...');
+            try {
+                const res = await fetch(`${SHEET_URL}?type=invoice&query=${searchId}`);
+                const json = await res.json();
+                if (json.status === 'ok' && json.data) {
+                    bkSet('reading', '📦', 'ব্যাকআপ থেকে দেখানো হচ্ছে', 'মেমো #' + searchId + ' — Firebase-এ নেই, Sheet থেকে নেওয়া হয়েছে', 'ব্যাকআপ ডেটা');
+                    bkToast('reading', '📦', 'পুরনো মেমো পাওয়া গেছে', 'মেমো #' + searchId + ' Google Sheet থেকে দেখানো হচ্ছে');
+                    showMemoPreview(json.data);
+                } else {
+                    bkSet('', '☁️', 'ব্যাকআপ সিস্টেম সক্রিয়', 'কোথাও পাওয়া যায়নি', 'প্রস্তুত');
+                    document.getElementById('memo-preview').innerHTML = 'মেমো প্রিভিউ...';
+                    alert('কোথাও পাওয়া যায়নি!');
+                }
+            } catch (e) {
+                alert('সার্চ করতে সমস্যা হয়েছে!');
+                document.getElementById('memo-preview').innerHTML = 'মেমো প্রিভিউ...';
+            }
+        }
+
+        function showMemoPreview(inv) {
+            currentPreviewInvoiceId = inv.id;
+            document.getElementById('memo-preview').innerHTML = inv.html || 'HTML পাওয়া যায়নি';
+            const qr = document.getElementById('memo-preview').querySelector('.qr-code-div');
+            if (qr) {
+                qr.innerHTML = "";
+                new QRCode(qr, {
+                    text: "https://www.facebook.com/HaziModasserClothStore",
+                    width: 70,
+                    height: 70
+                });
+            }
+            if (isAdmin) {
+                document.getElementById('re-print-btn').style.display = 'block';
+                document.getElementById('cancel-memo-btn').style.display = 'block';
+                document.getElementById('edit-memo-btn').style.display = 'block';
+            }
+        }
+
+        function showOld(id) {
+            let inv = allInvoices.find(i => i.id == id);
+            if (!inv) return alert('মেমো পাওয়া যায়নি!');
+            currentPreviewInvoiceId = inv.id;
+            // FIX: html undefined হলে সারসংক্ষেপ দেখাও — crash এড়াও
+            document.getElementById('memo-preview').innerHTML = inv.html ||
+                `<div style="padding:20px;text-align:center;color:#999;">মেমো #${inv.id} — HTML সংরক্ষিত নেই<br><small>তারিখ: ${inv.date} | ক্রেতা: ${inv.name} | মোট: ${inv.total}/-</small></div>`;
+            const qr = document.getElementById('memo-preview').querySelector('.qr-code-div');
+            if (qr) {
+                qr.innerHTML = "";
+                new QRCode(qr, { text: "https://www.facebook.com/HaziModasserClothStore", width: 70, height: 70 });
+            }
+            if (isAdmin) {
+                document.getElementById('re-print-btn').style.display = 'block';
+                document.getElementById('cancel-memo-btn').style.display = 'block';
+                document.getElementById('edit-memo-btn').style.display = 'block';
+            }
+        }
+
+        function updateDashboard() {
+            const memoEl  = document.getElementById('stat-memo');
+            const todayEl = document.getElementById('stat-today');
+            if (!memoEl || !todayEl) return;
+            const todayStr = getToday();
+            const todayInvs = allInvoices.filter(i => i.date === todayStr);
+            if (isAdmin) {
+                memoEl.innerText  = todayInvs.length;
+                todayEl.innerText = Math.round(todayInvs.reduce((s, i) => s + (parseFloat(i.paid) || 0), 0)) + "/-";
+            }
+        }
+
+        function directPrintFromPreview() {
+            printMemo(document.getElementById('memo-preview').innerHTML, "preview");
+        }
+
+        function loadRequestForEdit(key) {
+            db.ref('pending_requests/' + key).once('value', snap => {
+                const data = snap.val();
+                if (!data) return;
+                currentRequestKey  = key;
+                _originalSeller    = data.seller || null;
+                _pendingOriginalId = data.id     || null;
+                _selectedCustKey   = null; // FIX: পুরনো customer selection clear করো
+                document.getElementById('cust-name').value  = data.name;
+                document.getElementById('cust-phone').value = data.phone || '';
+                document.getElementById('disc-type').value  = data.discType || 'fixed';
+                document.getElementById('disc-val').value   = data.discVal  || '';
+                document.getElementById('paid-amt').value   = data.paid     || '';
+                document.getElementById('product-list-container').innerHTML = '';
+                (data.items || []).forEach(item => {
+                    if (item.name.includes("মাল ফেরত")) addReturnItemRow(item.qty, item.price, item.sid);
+                    else addNewItemRow(item.name, item.qty, item.price, item.sid);
+                });
+                calculate();
+                window.scrollTo(0, 0);
+            });
+        }
+
+        function rejectRequest(key) {
+            if (!confirm("বাতিল করবেন?")) return;
+            db.ref('pending_requests/' + key).remove();
+            // যদি এই request form-এ লোড করা থাকে, form ও state পরিষ্কার করো
+            if (currentRequestKey === key) {
+                currentRequestKey  = null;
+                _pendingOriginalId = null;
+                _originalSeller    = null;
+                _selectedCustKey   = null;
+                resetForm(); // FIX: form-এ পুরনো rejected data রেখে দেওয়া ঠেকাও
+            }
+        }
+        /* ── Product Autocomplete ── */
+        let _inventoryCache = null;
+        let _inventoryLiveListenerOn = false;
+
+        function getInventoryCache(cb) {
+            if (_inventoryCache) { cb(_inventoryCache); return; }
+            db.ref('inventory').once('value', snap => {
+                _inventoryCache = snap.val() || {};
+                // Live update cache on changes — একবারই attach করো
+                if (!_inventoryLiveListenerOn) {
+                    _inventoryLiveListenerOn = true;
+                    db.ref('inventory').on('value', s => { _inventoryCache = s.val() || {}; });
+                }
+                cb(_inventoryCache);
+            });
+        }
+
+        function searchProduct(e, rowId) {
+            const input = e.target;
+            const q = input.value.trim().toLowerCase();
+            closeAllDropdowns();
+            if (!q) return;
+
+            getInventoryCache(inventory => {
+                const results = [];
+                for (const key in inventory) {
+                    const p = inventory[key];
+                    const name   = (p.name   || '').toLowerCase();
+                    const serial = (p.serial  || key).toLowerCase();
+                    const barcode= (p.barcode || '').toLowerCase();
+                    if (name.includes(q) || serial.includes(q) || barcode.includes(q)) {
+                        results.push({ key, ...p, sID: p.serial || key });
+                    }
+                }
+                if (!results.length) return;
+
+                // Build dropdown
+                const dropdown = document.createElement('div');
+                dropdown.className = 'product-dropdown';
+                dropdown.id = 'dd-' + rowId;
+
+                results.slice(0, 10).forEach((p, idx) => {
+                    const qty = p.qty !== undefined ? p.qty : (p.stock || 0);
+                    const stockClass = qty <= 0 ? 'zero' : qty <= 5 ? 'low' : 'ok';
+                    const stockTxt   = qty <= 0 ? 'শেষ' : qty + ' পিস';
+                    const item = document.createElement('div');
+                    item.className = 'product-dropdown-item' + (idx === 0 ? ' active' : '');
+                    item.innerHTML = `
+                        <span class="pd-name">${p.name}</span>
+                        <span class="pd-serial">${p.sID}</span>
+                        <span class="pd-stock ${stockClass}">${stockTxt}</span>
+                        <span class="pd-price">৳${p.price}</span>`;
+                    item.onmousedown = (ev) => {
+                        ev.preventDefault(); // blur হওয়া আটকায়
+                        selectProduct(rowId, p);
+                    };
+                    dropdown.appendChild(item);
+                });
+
+                // keyboard nav
+                input.onkeydown = (ev) => {
+                    const dd = document.getElementById('dd-' + rowId);
+                    if (!dd) { handleSearchKey(ev, rowId); return; }
+                    const items = dd.querySelectorAll('.product-dropdown-item');
+                    const cur = Array.from(items).findIndex(i => i.classList.contains('active'));
+                    if (ev.key === 'ArrowDown') {
+                        ev.preventDefault();
+                        if (cur < items.length - 1) { items[cur]?.classList.remove('active'); items[cur + 1].classList.add('active'); }
+                    } else if (ev.key === 'ArrowUp') {
+                        ev.preventDefault();
+                        if (cur > 0) { items[cur]?.classList.remove('active'); items[cur - 1].classList.add('active'); }
+                    } else if (ev.key === 'Enter') {
+                        ev.preventDefault();
+                        const active = dd.querySelector('.product-dropdown-item.active');
+                        if (active) active.onmousedown(new Event('mousedown'));
+                        else handleSearchKey(ev, rowId);
+                    } else if (ev.key === 'Escape') {
+                        closeAllDropdowns();
+                    } else {
+                        // Restore default onkeydown
+                        input.onkeydown = (e2) => handleSearchKey(e2, rowId);
+                    }
+                };
+
+                const wrap = input.closest('.p-name-wrap');
+                if (wrap) wrap.appendChild(dropdown);
+            });
+        }
+
+        function selectProduct(rowId, p) {
+            const row = document.getElementById(rowId);
+            if (!row) return;
+            const fullName = p.name + ' (' + p.sID + ')';
+            row.querySelector('.p-name').value  = fullName;
+            row.querySelector('.p-price').value = p.price || '';
+            row.dataset.sid = p.sID;
+            closeAllDropdowns();
+            row.querySelector('.p-qty').select();
+            row.querySelector('.p-qty').focus();
+            calculate();
+        }
+
+        function closeAllDropdowns() {
+            document.querySelectorAll('.product-dropdown').forEach(d => d.remove());
+        }
+
+        // Click বাইরে হলে dropdown বন্ধ করো
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.p-name-wrap')) closeAllDropdowns();
+        });
+        /* ══ MEMO CANCEL & EDIT ══ */
+        let currentPreviewInvoiceId = null;
+        let _editRestoreCounter = null; // এডিট করার আগে আসল counter সেভ রাখে
+        let _editingOldInvoice = null;  // এডিট মোডে পুরনো মেমো ডেটা (বাকি হিসাবের জন্য)
+        let _originalSeller = null;     // pending request-এর original seller সেভ রাখে
+        let _pendingOriginalId = null;  // pending request-এর original invoice ID সেভ রাখে
+
+        function cancelCurrentMemo() {
+            if (!isAdmin) return;
+            const id = currentPreviewInvoiceId;
+            if (!id) return alert("কোনো মেমো সিলেক্ট নেই!");
+            if (!confirm(`মেমো #${id} বাতিল করবেন?\n✅ স্টক ফেরত যাবে\n🗑 Firebase ও ব্যাকআপ থেকে মুছে যাবে`)) return;
+
+            db.ref('invoices/' + id).once('value', snap => {
+                const inv = snap.val();
+                if (!inv) return alert("মেমো পাওয়া যায়নি!");
+                // স্টক ফেরত
+                (inv.items || []).forEach(item => {
+                    const sID = item.sid || item.id;
+                    if (!sID) return;
+                    const isReturn = (item.name || '').includes("মাল ফেরত");
+                    db.ref('inventory/' + sID + '/qty').transaction(cur => {
+                        const c = parseFloat(cur) || 0;
+                        return isReturn ? Math.max(0, c - item.qty) : c + item.qty;
+                    }).then(() => {
+                        db.ref('inventory_updates/' + sID).set(Date.now());
+                    });
+                });
+                // Firebase থেকে ডিলিট
+                db.ref('invoices/' + id).remove();
+                // Backup server থেকে ডিলিট
+                fetch(SHEET_URL, {
+                    method: 'POST',
+                    body: JSON.stringify({ type: 'delete_invoice', data: { id } })
+                }).catch(() => {});
+                // Local array থেকে সরাও
+                allInvoices = allInvoices.filter(i => i.id != id);
+
+                // ══ Credit Book Cleanup: বাকি মেমো বাতিলে ledger থেকেও সরাও ══
+                if (inv.name && inv.name !== "নগদ" && parseFloat(inv.due) > 0) {
+                    // invoice-এ stored custKey থাকলে সেটা ব্যবহার করো — নইলে নাম থেকে তৈরি করো
+                    const custKey = inv.custKey || makeCustKey(inv.name);
+                    db.ref(`${CB}/entries/${custKey}/${id}/status`).set('cancelled');
+                    db.ref(`${CB}/customers/${custKey}/totalDue`).transaction(cur =>
+                        Math.max(0, Math.round((cur || 0) - parseFloat(inv.due)))
+                    );
+                    db.ref(`${CB}/customers/${custKey}/lastActivity`).set(Date.now());
+                    bkToast('', '📒', 'বাকি খাতা আপডেট', `${inv.name} — বাকি #${id} বাতিল হয়েছে`);
+                }
+
+                // UI আপডেট
+                document.getElementById('memo-preview').innerHTML =
+                    `<div style="text-align:center;padding:30px;color:var(--red);font-size:18px;font-weight:bold;">❌ মেমো #${id} বাতিল ও মুছে ফেলা হয়েছে<br><small style="font-size:13px;color:#666;">স্টক ফেরত দেওয়া হয়েছে</small></div>`;
+                document.getElementById('cancel-memo-btn').style.display = 'none';
+                document.getElementById('edit-memo-btn').style.display = 'none';
+                document.getElementById('re-print-btn').style.display = 'none';
+                currentPreviewInvoiceId = null;
+                bkToast('error', '🗑', 'মেমো বাতিল ও ডিলিট', `মেমো #${id} মুছে গেছে, স্টক ফেরত গেছে`);
+            });
+        }
+
+        function editCurrentMemo() {
+            if (!isAdmin) return;
+            const id = currentPreviewInvoiceId;
+            if (!id) return alert("কোনো মেমো সিলেক্ট নেই!");
+            if (!confirm(`মেমো #${id} এডিট করবেন?\n\n📝 ফর্মে লোড হবে — পরিবর্তন করে সেভ করুন\n✅ সেভ করলে স্টক আপডেট + একই নম্বরে সেভ হবে\n⚠️ সেভ না করলে কোনো পরিবর্তন হবে না`)) return;
+
+            db.ref('invoices/' + id).once('value', snap => {
+                const inv = snap.val();
+                if (!inv) return alert("মেমো পাওয়া যায়নি!");
+
+                // পুরনো ডেটা সংরক্ষণ করো — সেভ করার সময় ব্যবহার হবে
+                _editingOldInvoice = inv;
+
+                // ══ counter সেট: save হলে একই ID পাবে ══
+                // (তাৎক্ষণিক ডিলিট করা হচ্ছে না — browser crash হলেও মেমো নিরাপদ)
+                db.ref('invoice_counter').once('value', csnap => {
+                    _editRestoreCounter = csnap.val();
+                    db.ref('invoice_counter').set(Number(id) - 1);
+                });
+
+                // Form-এ লোড করো (এখনই কোনো ডিলিট বা স্টক পরিবর্তন নয়)
+                document.getElementById('cust-name').value  = inv.name     || '';
+                document.getElementById('cust-phone').value = inv.phone    || '';
+                document.getElementById('disc-type').value  = inv.discType || 'fixed';
+                document.getElementById('disc-val').value   = inv.discVal  || '';
+                document.getElementById('paid-amt').value   = inv.paid     || '';
+                document.getElementById('product-list-container').innerHTML = '';
+                (inv.items || []).forEach(item => {
+                    if ((item.name || '').includes("মাল ফেরত"))
+                        addReturnItemRow(item.qty, item.price, item.sid || item.id);
+                    else
+                        addNewItemRow(item.name, item.qty, item.price, item.sid || item.id);
+                });
+                calculate();
+                currentRequestKey  = null;
+                _pendingOriginalId = null;
+                _originalSeller    = null;
+                _selectedCustKey   = null; // FIX: পুরনো customer selection clear করো
+                document.getElementById('memo-preview').innerHTML =
+                    `<div style="text-align:center;padding:20px;color:#f57f17;font-weight:bold;">✏️ মেমো #${id} এডিটের জন্য লোড হয়েছে<br><small style="font-size:13px;color:#666;">পরিবর্তন করে সেভ করুন — #${id} নম্বরে সেভ হবে</small></div>`;
+                document.getElementById('cancel-memo-btn').style.display = 'none';
+                document.getElementById('edit-memo-btn').style.display   = 'none';
+                document.getElementById('re-print-btn').style.display    = 'none';
+                currentPreviewInvoiceId = null;
+                bkToast('', '✏️', 'মেমো এডিট মোড', `মেমো #${id} লোড — সেভ করলে একই নম্বরে যাবে`);
+                window.scrollTo(0, 0);
+            });
+        }
+
+        /* ══ DARK MODE ══ */
+        function toggleDark() {
+            const isDark = document.body.classList.toggle('dark-mode');
+            document.getElementById('dark-toggle').textContent = isDark ? '☀️' : '🌙';
+            localStorage.setItem('pos_dark', isDark ? '1' : '0');
+        }
+        if (localStorage.getItem('pos_dark') === '1') {
+            document.body.classList.add('dark-mode');
+            // Script is already at bottom of body — DOM is ready, no need for DOMContentLoaded
+            const btn = document.getElementById('dark-toggle');
+            if (btn) btn.textContent = '☀️';
+        }
+
+        /* ══ OFFLINE DETECTION ══ */
+        function updateOnlineStatus() {
+            const banner = document.getElementById('offline-banner');
+            if (!banner) return;
+            if (!navigator.onLine) {
+                banner.style.display = 'block';
+            } else {
+                banner.style.display = 'none';
+                bkToast('', '🌐', 'Internet সংযোগ পাওয়া গেছে', 'Pending ব্যাকআপ পাঠানো হচ্ছে...');
+                setTimeout(bkSendPending, 2000);
+            }
+        }
+        window.addEventListener('online',  updateOnlineStatus);
+        window.addEventListener('offline', updateOnlineStatus);
+        updateOnlineStatus();
+
+        /* ══ CREDIT BOOK SYNC ══════════════════════════════════════════════════ */
+        // CB constant উপরে logoutUser-এর আগে declare করা হয়েছে
+
+        function makeCustKey(name) {
+            // ══ ECOSYSTEM STANDARD KEY ══
+            // baki_khata mkey() ও Apps Script makeCustKey() এর সাথে হুবহু মিলিয়ে রাখা হয়েছে
+            // Firebase key-এ নিষিদ্ধ চরিত্র: . $ # [ ] / \
+            // Bengali Unicode Firebase Realtime DB-তে key হিসেবে সমর্থিত → encode করা হয় না
+            return (name || '').trim()
+                .replace(/[\.\$\#\[\]\/\\]/g, '')
+                .replace(/\s+/g, '_')
+                .substring(0, 50) || 'unknown';
+        }
+
+        /* নতুন বাকি মেমো → credit_ledger এ যোগ */
+        function addToCreditLedger(inv) {
+            if (!inv.name || inv.name === "নগদ" || !(parseFloat(inv.due) > 0)) return;
+
+            // ══ গুরুত্বপূর্ণ fix: dropdown থেকে বাছাই হলে সেই Firebase key ব্যবহার করো ══
+            // makeCustKey(name) দিয়ে নতুন key তৈরি হলে encoding পার্থক্যে ভিন্ন entry হতে পারে
+            const custKey = _selectedCustKey || makeCustKey(inv.name);
+
+            const entryData = {
+                custKey,                                   // ← Apps Script saveBakiEntry-এ দরকার
+                memoId: inv.id,
+                memoRef: String(inv.id),                   // ← বাকি খাতা ledger-এ ref হিসেবে দেখায়
+                date: inv.date,
+                custName: inv.name,
+                custPhone: inv.phone || '',
+                total: Math.round(inv.total || 0),
+                paid: Math.round(inv.paid || 0),
+                originalDue: Math.round(inv.due || 0),
+                remainingDue: Math.round(inv.due || 0),
+                discAmt: Math.round(inv.discAmt || 0),
+                note: `মেমো #${inv.id} বিক্রয়`,          // ← Apps Script row col: note
+                type: 'sale',                              // ← Apps Script row col: type
+                items: inv.items || [],
+                status: 'due',
+                createdAt: Date.now()
+            };
+            // Customer node আপডেট
+            db.ref(`${CB}/customers/${custKey}`).transaction(cur => {
+                return {
+                    name: inv.name,
+                    phone: inv.phone || (cur && cur.phone) || '',
+                    totalDue: Math.round(((cur && cur.totalDue) || 0) + parseFloat(inv.due)),
+                    lastActivity: Date.now()
+                };
+            });
+            // Entry সেভ
+            db.ref(`${CB}/entries/${custKey}/${inv.id}`).set(entryData);
+            bkToast('', '📒', 'বাকি খাতায় যোগ', `${inv.name} — বাকি: ${Math.round(inv.due)}/- (#${inv.id})`);
+            // Backup server এ পাঠাও
+            bkSend('credit_entry', entryData);
+        }
+
+        /* এডিট করে বাকি কমানো হলে payment রেকর্ড */
+        function syncCreditPaymentFromEdit(oldInv, newInv, collected) {
+            if (!oldInv.name || oldInv.name === "নগদ") return;
+            const custKey = oldInv.custKey || makeCustKey(oldInv.name);
+            const today = getToday();
+
+            // FIFO: পুরনো entry আপডেট
+            db.ref(`${CB}/entries/${custKey}/${oldInv.id}`).transaction(cur => {
+                if (!cur) return cur;
+                const newRem = Math.max(0, (cur.remainingDue || 0) - collected);
+                return {
+                    ...cur,
+                    remainingDue: newRem,
+                    status: newRem <= 0 ? 'cleared' : 'partial'
+                };
+            });
+
+            // Customer total due আপডেট
+            db.ref(`${CB}/customers/${custKey}/totalDue`).transaction(cur =>
+                Math.max(0, Math.round((cur || 0) - collected))
+            );
+            db.ref(`${CB}/customers/${custKey}/lastActivity`).set(Date.now());
+
+            // Payment রেকর্ড
+            const payId = 'pay_' + Date.now(); // ← Apps Script duplicate-check এর জন্য
+            const payData = {
+                payId,
+                custKey, custName: oldInv.name,
+                amount: collected, date: today,
+                fromMemoId: oldInv.id, receivedAt: Date.now(),
+                note: `মেমো #${oldInv.id} এডিটে নগদ প্রাপ্তি`
+            };
+            db.ref(`${CB}/payments/${custKey}`).push(payData);
+
+            // আজকের নগদ প্রাপ্তিতে যোগ (daily_credit_receipts)
+            db.ref(`${CB}/daily_receipts/${today}`).transaction(cur => {
+                return {
+                    total: Math.round(((cur && cur.total) || 0) + collected),
+                    lastUpdate: Date.now()
+                };
+            });
+            db.ref(`${CB}/daily_receipts/${today}/entries`).push(payData);
+
+            bkToast('', '💰', 'বাকি আদায়', `${oldInv.name} — আদায়: ${collected}/- (#${oldInv.id})`);
+            bkSend('credit_payment', payData);
+        }
+
+        /* ══ CUSTOMER AUTOCOMPLETE FROM CREDIT BOOK ══════════════════════════ */
+        let _creditCustomersCache = {};
+
+        let _creditCacheListenerActive = false;
+        function initCreditCustomerCache() {
+            if (!_creditCacheListenerActive) {
+                _creditCacheListenerActive = true;
+                db.ref(`${CB}/customers`).on('value', snap => {
+                    _creditCustomersCache = snap.val() || {};
+                });
+            }
+        }
+
+        // body-level dropdown — overflow/z-index সমস্যা এড়াতে
+        let _ddIsScrolling = false; // container-level scroll flag
+        function getCreditDD() {
+            let dd = document.getElementById('_cust_float_dd');
+            if (!dd) {
+                dd = document.createElement('div');
+                dd.id = '_cust_float_dd';
+                dd.style.cssText = `
+                    position:fixed; z-index:99999;
+                    background:#fff; border:2px solid #1e88e5;
+                    border-radius:8px; box-shadow:0 8px 28px rgba(0,0,0,0.22);
+                    max-height:260px; overflow-y:auto;
+                    display:none; min-width:240px;
+                `;
+                // Container-এ touchstart/touchmove দিয়ে scroll detect করো
+                dd.addEventListener('touchstart', (e) => {
+                    _ddIsScrolling = false;
+                    dd._touchStartY = e.touches[0].clientY;
+                }, { passive: true });
+                dd.addEventListener('touchmove', (e) => {
+                    if (Math.abs(e.touches[0].clientY - dd._touchStartY) > 5) {
+                        _ddIsScrolling = true; // ৫px এর বেশি নড়লে scroll
+                    }
+                }, { passive: true });
+                document.body.appendChild(dd);
+            }
+            return dd;
+        }
+
+        function searchCreditCustomer(q) {
+            // ইউজার নিজে টাইপ করলে আগের selected key বাতিল করো
+            _selectedCustKey = null;
+
+            const dd = getCreditDD();
+            const inp = document.getElementById('cust-name');
+
+            if (!q || q.length < 1) { dd.style.display = 'none'; return; }
+
+            const qL = q.toLowerCase();
+            const matches = Object.entries(_creditCustomersCache)
+                .filter(([k, c]) =>
+                    (c.name || '').toLowerCase().includes(qL) ||
+                    (c.phone || '').includes(q)
+                )
+                .sort((a, b) => (a[1].name || '').localeCompare(b[1].name || '', 'bn'))
+                .slice(0, 10);
+
+            if (!matches.length) { dd.style.display = 'none'; return; }
+
+            // input এর position নিয়ে dropdown position করো
+            const rect = inp.getBoundingClientRect();
+            dd.style.top  = (rect.bottom + 2) + 'px';
+            dd.style.left = rect.left + 'px';
+            dd.style.width = rect.width + 'px';
+
+            dd.innerHTML = matches.map(([k, c]) => `
+                <div style="padding:10px 13px; cursor:pointer; display:flex;
+                    justify-content:space-between; align-items:center; gap:8px;
+                    border-bottom:1px solid #f0f0f0; font-size:13px;
+                    transition:background .12s;"
+                    onmouseover="this.style.background='#e3f2fd'"
+                    onmouseout="this.style.background=''"
+                    onmousedown="event.preventDefault();_pickCust('${k}')"
+                    ontouchend="if(!_ddIsScrolling){event.preventDefault();_pickCust('${k}')}">
+                    <span style="flex:1;font-weight:600;color:#263238;">${c.name}</span>
+                    <span style="font-size:11px;color:#90a4ae;">${c.phone || ''}</span>
+                    <span style="font-size:11px;padding:2px 7px;border-radius:10px;white-space:nowrap;
+                        background:${c.totalDue > 0 ? '#fff3e0' : '#e8f5e9'};
+                        color:${c.totalDue > 0 ? '#e65100' : '#2e7d32'};">
+                        বাকি: ${Math.round(c.totalDue || 0)}/-
+                    </span>
+                </div>`).join('');
+
+            dd.style.display = 'block';
+        }
+
+        function _pickCust(key) {
+            const c = _creditCustomersCache[key];
+            if (!c) return;
+            // ══ গুরুত্বপূর্ণ: Firebase key সরাসরি সংরক্ষণ করো ══
+            // এর ফলে addToCreditLedger-এ makeCustKey() ডাকার দরকার নেই
+            // নাম থেকে key পুনরায় তৈরি হলে encoding/whitespace পার্থক্যে ভিন্ন key হওয়ার সুযোগ থাকে
+            _selectedCustKey = key;
+            document.getElementById('cust-name').value  = c.name;
+            document.getElementById('cust-phone').value = c.phone || '';
+            closeCreditDropdown();
+        }
+
+        // _pickCust() সরাসরি onmousedown থেকে call হয় — selectCreditCustomer wrapper অপ্রয়োজনীয়
+
+        function closeCreditDropdown() {
+            const dd = document.getElementById('_cust_float_dd');
+            if (dd) dd.style.display = 'none';
+        }
+
+        // window scroll/resize এ dropdown reposition বা বন্ধ করো
+        window.addEventListener('scroll', closeCreditDropdown, true);
+        window.addEventListener('resize', closeCreditDropdown);
+
+        /* ══ DAILY REPORT — credit receipts যোগ করো ══ */
+        function showDailyReport() {
+            if (!isAdmin) return;
+            const date = document.getElementById('report-date').value;
+            const filtered = allInvoices.filter(i => i.date === date);
+            const sumPaid = filtered.reduce((s, i) => s + (parseFloat(i.paid) || 0), 0);
+            const sumTotal = filtered.reduce((s, i) => s + (parseFloat(i.total) || 0), 0);
+            const sumDue = filtered.reduce((s, i) => s + (parseFloat(i.due) || 0), 0);
+
+            // Credit receipts for this date
+            db.ref(`${CB}/daily_receipts/${date}`).once('value', snap => {
+                const cr = snap.val();
+                const creditCollected = cr ? (cr.total || 0) : 0;
+                const totalCash = Math.round(sumPaid + creditCollected);
+
+                let html = `<div style="line-height:1.9; font-size:13px;">
+                    <b>বিক্রয় (মেমো সংখ্যা: ${filtered.length})</b><br>
+                    💰 মোট বিক্রয়: <b>${Math.round(sumTotal)}/-</b><br>
+                    ✅ নগদ জমা (বিক্রয়): <b>${Math.round(sumPaid)}/-</b><br>
+                    🔴 বাকি দেওয়া: <b>${Math.round(sumDue)}/-</b>`;
+                if (creditCollected > 0) {
+                    html += `<br>💚 বাকি আদায় (আজ): <b style="color:green;">${Math.round(creditCollected)}/-</b>
+                    <br><b style="color:#1e88e5;">📊 মোট নগদ প্রাপ্তি: ${totalCash}/-</b>`;
+                }
+                html += `</div>`;
+                document.getElementById('report-result').innerHTML = html;
+                document.getElementById('report-list').innerHTML =
+                    filtered.map(i => `<div style="padding:5px; border-bottom:1px solid #eee; cursor:pointer; display:flex; justify-content:space-between;" onclick="showOld('${i.id}')">
+                        <span>#${i.id} — ${i.name}</span>
+                        <span style="color:${i.due > 0 ? 'red' : 'green'};">
+                            জমা:${Math.round(i.paid)}/- ${i.due > 0 ? `বাকি:${Math.round(i.due)}/-` : '✓'}
+                        </span>
+                    </div>`).join('');
+            });
+        }
+
+        /* ══ PREMIUM LIVE WALLPAPER ══ */
+        (function initWallpaper() {
+            const canvas = document.getElementById('login-canvas');
+            const ctx = canvas.getContext('2d');
+            let W, H, t = 0;
+
+            // ─── Silk threads ───
+            const THREADS = [];
+            const THREAD_COUNT = 55;
+            // ─── Bokeh lights ───
+            const BOKEH = [];
+            const BOKEH_COUNT = 38;
+            // ─── Mandala points ───
+            const MANDALA_R = [];
+
+            const GOLD   = [212, 175, 55];
+            const COPPER = [184, 115, 51];
+            const MAROON = [128, 0,  32];
+            const TEAL   = [0,  128, 128];
+            const COLORS = [GOLD, COPPER, MAROON, TEAL,
+                            [180,150,30],[160,80,40],[100,0,60],[20,120,100]];
+
+            function rnd(a,b){ return a + Math.random()*(b-a); }
+            function rgba(c, a){ return `rgba(${c[0]},${c[1]},${c[2]},${a})`; }
+
+            function resize() {
+                W = canvas.width  = window.innerWidth;
+                H = canvas.height = window.innerHeight;
+                initBokeh();
+            }
+            window.addEventListener('resize', resize);
+
+            // ─── Init silk threads ───
+            function makeThread() {
+                const col = COLORS[Math.floor(Math.random()*COLORS.length)];
+                return {
+                    x:    rnd(0, W),
+                    y:    rnd(-H*0.3, H*1.3),
+                    len:  rnd(H*0.25, H*0.7),
+                    w:    rnd(0.3, 1.2),
+                    col,
+                    alpha: rnd(0.04, 0.18),
+                    phase: rnd(0, Math.PI*2),
+                    freq:  rnd(0.003, 0.008),
+                    amp:   rnd(30, 120),
+                    speed: rnd(0.0003, 0.0008) * (Math.random()<0.5?1:-1),
+                    drift: rnd(-0.08, 0.08),
+                };
+            }
+            for(let i=0;i<THREAD_COUNT;i++) THREADS.push(makeThread());
+
+            // ─── Init bokeh (out-of-focus light orbs) ───
+            function initBokeh() {
+                BOKEH.length = 0;
+                for(let i=0;i<BOKEH_COUNT;i++) {
+                    const col = COLORS[Math.floor(Math.random()*COLORS.length)];
+                    BOKEH.push({
+                        x:    rnd(0,W), y: rnd(0,H),
+                        r:    rnd(18,90),
+                        col,
+                        alpha: rnd(0.015, 0.06),
+                        vx:   rnd(-0.12,0.12),
+                        vy:   rnd(-0.10,0.10),
+                        pulse: rnd(0,Math.PI*2),
+                        pSpeed: rnd(0.006,0.018),
+                    });
+                }
+            }
+
+            // ─── Mandala pre-compute ───
+            const MANDALA_ARMS = 16;
+            const MANDALA_RINGS = 5;
+            for(let ring=1;ring<=MANDALA_RINGS;ring++) {
+                for(let arm=0;arm<MANDALA_ARMS;arm++) {
+                    const base = (arm / MANDALA_ARMS) * Math.PI*2;
+                    MANDALA_R.push({ base, ring, offset: rnd(0,0.3) });
+                }
+            }
+
+            // ─── Draw mandala ───
+            function drawMandala(cx,cy,tLocal) {
+                const maxR = Math.min(W,H) * 0.42;
+                ctx.save();
+                ctx.translate(cx,cy);
+                ctx.rotate(tLocal * 0.018);
+
+                for(let {base,ring,offset} of MANDALA_R) {
+                    const r   = (ring/MANDALA_RINGS) * maxR;
+                    const angle = base + tLocal*0.004*(ring%2?1:-1) + offset;
+                    const x = Math.cos(angle)*r, y = Math.sin(angle)*r;
+                    const col = COLORS[(ring+Math.floor(base))%COLORS.length];
+                    const a   = 0.04 + Math.sin(tLocal*0.02+ring+base)*0.02;
+                    ctx.beginPath();
+                    ctx.arc(x, y, 1.5 + ring*0.4, 0, Math.PI*2);
+                    ctx.fillStyle = rgba(col, Math.max(0,a));
+                    ctx.fill();
+                    // connecting lines
+                    if(ring > 1) {
+                        const r2 = ((ring-1)/MANDALA_RINGS)*maxR;
+                        const x2 = Math.cos(angle)*r2, y2 = Math.sin(angle)*r2;
+                        ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x2,y2);
+                        ctx.strokeStyle = rgba(col, Math.max(0,a*0.5));
+                        ctx.lineWidth   = 0.4;
+                        ctx.stroke();
+                    }
+                }
+
+                // Inner glowing ring
+                for(let i=0;i<3;i++) {
+                    const grd = ctx.createRadialGradient(0,0,0,0,0, maxR*(0.12+i*0.08));
+                    grd.addColorStop(0,   rgba(GOLD, 0.06-i*0.015));
+                    grd.addColorStop(1,   rgba(GOLD, 0));
+                    ctx.beginPath(); ctx.arc(0,0,maxR*(0.12+i*0.08),0,Math.PI*2);
+                    ctx.fillStyle = grd; ctx.fill();
+                }
+                ctx.restore();
+            }
+
+            // ─── Draw aurora bands ───
+            function drawAurora(tLocal) {
+                const bands = [
+                    { y:H*0.18, col:MAROON, w:H*0.22 },
+                    { y:H*0.42, col:TEAL,   w:H*0.18 },
+                    { y:H*0.70, col:GOLD,   w:H*0.20 },
+                    { y:H*0.88, col:COPPER, w:H*0.16 },
+                ];
+                for(const b of bands) {
+                    const yOff = Math.sin(tLocal*0.005 + b.y)*18;
+                    const grd  = ctx.createLinearGradient(0, b.y+yOff-b.w/2, 0, b.y+yOff+b.w/2);
+                    grd.addColorStop(0,   rgba(b.col, 0));
+                    grd.addColorStop(0.5, rgba(b.col, 0.045));
+                    grd.addColorStop(1,   rgba(b.col, 0));
+                    ctx.fillStyle = grd;
+                    ctx.fillRect(0, b.y+yOff-b.w/2, W, b.w);
+                }
+            }
+
+            // ─── Main draw loop ───
+            function draw() {
+                t++;
+
+                // Deep background
+                ctx.fillStyle = '#02050d';
+                ctx.fillRect(0,0,W,H);
+
+                // Vignette
+                const vig = ctx.createRadialGradient(W/2,H/2,0, W/2,H/2, Math.max(W,H)*0.75);
+                vig.addColorStop(0, 'rgba(0,0,0,0)');
+                vig.addColorStop(1, 'rgba(0,0,0,0.72)');
+
+                // Aurora bands
+                drawAurora(t);
+
+                // Bokeh orbs
+                for(const b of BOKEH) {
+                    b.x += b.vx; b.y += b.vy;
+                    if(b.x < -b.r) b.x = W+b.r;
+                    if(b.x > W+b.r) b.x = -b.r;
+                    if(b.y < -b.r) b.y = H+b.r;
+                    if(b.y > H+b.r) b.y = -b.r;
+                    b.pulse += b.pSpeed;
+                    const a = b.alpha * (0.7 + 0.3*Math.sin(b.pulse));
+                    const grd = ctx.createRadialGradient(b.x,b.y,0, b.x,b.y,b.r);
+                    grd.addColorStop(0,   rgba(b.col, a));
+                    grd.addColorStop(0.5, rgba(b.col, a*0.3));
+                    grd.addColorStop(1,   rgba(b.col, 0));
+                    ctx.beginPath(); ctx.arc(b.x,b.y,b.r,0,Math.PI*2);
+                    ctx.fillStyle = grd; ctx.fill();
+                }
+
+                // Silk threads
+                for(const th of THREADS) {
+                    th.phase += th.speed * 60;
+                    th.x     += th.drift;
+                    if(th.x < -200) th.x = W+200;
+                    if(th.x > W+200) th.x = -200;
+
+                    ctx.beginPath();
+                    ctx.moveTo(th.x, th.y);
+                    for(let s=0; s<=th.len; s+=4) {
+                        const wave = Math.sin(th.phase + s*th.freq) * th.amp;
+                        ctx.lineTo(th.x + wave, th.y + s);
+                    }
+                    ctx.strokeStyle = rgba(th.col, th.alpha);
+                    ctx.lineWidth   = th.w;
+                    ctx.lineCap     = 'round';
+                    ctx.stroke();
+                }
+
+                // Mandala (centre)
+                drawMandala(W/2, H/2, t);
+
+                // Subtle gold star-burst overlay
+                ctx.save();
+                ctx.translate(W/2, H/2);
+                for(let i=0;i<8;i++) {
+                    const ang = (i/8)*Math.PI*2 + t*0.003;
+                    const len = Math.min(W,H)*0.38;
+                    const grd = ctx.createLinearGradient(0,0, Math.cos(ang)*len, Math.sin(ang)*len);
+                    grd.addColorStop(0,   rgba(GOLD, 0.04));
+                    grd.addColorStop(1,   rgba(GOLD, 0));
+                    ctx.beginPath(); ctx.moveTo(0,0);
+                    ctx.lineTo(Math.cos(ang)*len, Math.sin(ang)*len);
+                    ctx.strokeStyle = grd; ctx.lineWidth=1; ctx.stroke();
+                }
+                ctx.restore();
+
+                // Vignette on top
+                ctx.fillStyle = vig;
+                ctx.fillRect(0,0,W,H);
+
+                // Centre glow behind card
+                const cg = ctx.createRadialGradient(W/2,H/2,0,W/2,H/2,210);
+                cg.addColorStop(0,   rgba(GOLD, 0.07));
+                cg.addColorStop(0.6, rgba(GOLD, 0.02));
+                cg.addColorStop(1,   rgba(GOLD, 0));
+                ctx.fillStyle = cg; ctx.fillRect(0,0,W,H);
+
+                requestAnimationFrame(draw);
+            }
+
+            resize();
+            draw();
+        })();
+
+        /* ══════════════════════════════════════════════════════════
+           ইউজার ম্যানেজমেন্ট
+        ══════════════════════════════════════════════════════════ */
+        function openUserModal() {
+            if (!isAdmin) return;
+            document.getElementById('user-modal').style.display = 'flex';
+            renderUserList();
+        }
+
+        function closeUserModal() {
+            document.getElementById('user-modal').style.display = 'none';
+        }
+
+        function renderUserList() {
+            db.ref('pos_users').once('value', snap => {
+                _allUsers = snap.val() || {};
+                const el = document.getElementById('user-list');
+                if (!Object.keys(_allUsers).length) {
+                    el.innerHTML = '<p style="color:#999; text-align:center;">কোনো ইউজার নেই</p>';
+                    return;
+                }
+                el.innerHTML = Object.entries(_allUsers).map(([key, u]) => `
+                    <div style="display:flex; align-items:center; gap:8px; padding:10px; border:1px solid #eee; border-radius:8px; margin-bottom:8px;">
+                        <div style="flex:1;">
+                            <b>${u.name}</b>
+                            <span style="margin-left:8px; font-size:11px; padding:2px 8px; border-radius:10px; background:${u.role==='admin'?'#b71c1c':'#1b5e20'}; color:white;">${u.role==='admin'?'অ্যাডমিন':'ইউজার'}</span>
+                            <div style="font-size:12px; color:#999; margin-top:2px;">পিন: ${'*'.repeat((u.pin||'').length)}</div>
+                        </div>
+                        <button onclick="changePinPrompt('${key}','${u.name}')" style="background:#f57f17; color:white; border:none; padding:6px 10px; border-radius:6px; cursor:pointer; font-size:12px;">পিন পরিবর্তন</button>
+                        <button onclick="deleteUser('${key}','${u.name}')" style="background:#d32f2f; color:white; border:none; padding:6px 10px; border-radius:6px; cursor:pointer; font-size:12px;">❌ ডিলিট</button>
+                    </div>`).join('');
+            });
+        }
+
+        function addUser() {
+            const name = document.getElementById('new-user-name').value.trim();
+            const pin  = document.getElementById('new-user-pin').value.trim();
+            const role = document.getElementById('new-user-role').value;
+            if (!name || !pin) return alert('নাম ও পিন দিন!');
+            if (pin.length < 4) return alert('পিন কমপক্ষে ৪ সংখ্যার হতে হবে!');
+
+            // Duplicate নাম ও PIN চেক
+            for (const k in _allUsers) {
+                if ((_allUsers[k].name || '').trim().toLowerCase() === name.toLowerCase()) {
+                    return alert(`"${name}" নামে আগে থেকেই একজন ইউজার আছে!`);
+                }
+                if (String(_allUsers[k].pin) === String(pin)) {
+                    return alert(`এই পিনটি "${_allUsers[k].name}" এর জন্য আগে থেকেই আছে!`);
+                }
+            }
+
+            db.ref('pos_users').push({ name, pin, role, createdAt: Date.now() }).then(() => {
+                document.getElementById('new-user-name').value = '';
+                document.getElementById('new-user-pin').value = '';
+                alert(`✅ "${name}" যোগ করা হয়েছে!`);
+                renderUserList();
+                loadUsers(); // _allUsers আপডেট করো
+            });
+        }
+
+        function deleteUser(key, name) {
+            // নিজেকে ডিলিট করা থেকে বিরত রাখো
+            if (key === currentUser.key) {
+                return alert('❌ নিজের অ্যাকাউন্ট ডিলিট করা যাবে না!\nঅন্য অ্যাডমিন থেকে করুন।');
+            }
+            if (!confirm(`"${name}" কে ডিলিট করবেন?`)) return;
+            db.ref('pos_users/' + key).remove().then(() => {
+                alert(`"${name}" ডিলিট হয়েছে।`);
+                renderUserList();
+            });
+        }
+
+        function changePinPrompt(key, name) {
+            const newPin = prompt(`"${name}" এর নতুন পিন কোড লিখুন:`);
+            if (!newPin || newPin.length < 4) return alert('পিন কমপক্ষে ৪ সংখ্যার হতে হবে!');
+
+            // Duplicate PIN চেক
+            for (const k in _allUsers) {
+                if (k !== key && String(_allUsers[k].pin) === String(newPin)) {
+                    return alert(`এই পিনটি "${_allUsers[k].name}" এর জন্য আগে থেকেই আছে!`);
+                }
+            }
+
+            db.ref('pos_users/' + key + '/pin').set(newPin).then(() => {
+                alert(`✅ "${name}" এর পিন পরিবর্তন হয়েছে।`);
+                renderUserList();
+            });
+        }
+
+        function changeAdminPin() {
+            const newPin = document.getElementById('new-admin-pin').value.trim();
+            if (!newPin || newPin.length < 4) return alert('পিন কমপক্ষে ৪ সংখ্যার হতে হবে!');
+
+            // নিজের (admin) key খুঁজো
+            const adminKey = currentUser.key;
+            if (!adminKey) return alert('অ্যাডমিন key পাওয়া যায়নি!');
+
+            db.ref('pos_users/' + adminKey + '/pin').set(newPin).then(() => {
+                currentUser.pin = newPin;
+                document.getElementById('new-admin-pin').value = '';
+                alert('✅ অ্যাডমিন পিন পরিবর্তন হয়েছে। পরের বার নতুন পিন দিয়ে লগইন করুন।');
+            });
+        }
+
+        /* ══════════════════════════════════════════════════════════
+           বিক্রয় রিপোর্ট (বিক্রেতা অনুযায়ী)
+        ══════════════════════════════════════════════════════════ */
+        function openSalesReport() {
+            if (!isAdmin) return;
+            document.getElementById('sales-report-modal').style.display = 'flex';
+            loadSalesReport();
+        }
+
+        function closeSalesReport() {
+            document.getElementById('sales-report-modal').style.display = 'none';
+        }
+
+        function loadSalesReport() {
+            const period = document.getElementById('sr-period').value;
+            const fromEl = document.getElementById('sr-from');
+            const toEl   = document.getElementById('sr-to');
+
+            fromEl.style.display = period === 'custom' ? 'block' : 'none';
+            toEl.style.display   = period === 'custom' ? 'block' : 'none';
+
+            const today = getToday();
+            const todayDate = new Date(today);
+
+            let fromDate, toDate;
+
+            if (period === 'daily') {
+                fromDate = toDate = today;
+            } else if (period === 'monthly') {
+                fromDate = today.substring(0, 7) + '-01';
+                const lastDay = new Date(todayDate.getFullYear(), todayDate.getMonth() + 1, 0);
+                toDate = lastDay.toISOString().split('T')[0];
+            } else if (period === 'yearly') {
+                fromDate = todayDate.getFullYear() + '-01-01';
+                toDate   = todayDate.getFullYear() + '-12-31';
+            } else {
+                fromDate = fromEl.value || today;
+                toDate   = toEl.value   || today;
+            }
+
+            if (!fromDate || !toDate) return;
+
+            // Filter invoices
+            const filtered = allInvoices.filter(inv => {
+                return inv.date >= fromDate && inv.date <= toDate;
+            });
+
+            // Group by seller
+            const byUser = {};
+            filtered.forEach(inv => {
+                const seller = inv.seller || 'অজানা';
+                if (!byUser[seller]) byUser[seller] = { count: 0, total: 0, paid: 0, due: 0 };
+                byUser[seller].count++;
+                byUser[seller].total += parseFloat(inv.total) || 0;
+                byUser[seller].paid  += parseFloat(inv.paid)  || 0;
+                byUser[seller].due   += parseFloat(inv.due)   || 0;
+            });
+
+            const grandTotal = filtered.reduce((s, i) => s + (parseFloat(i.total) || 0), 0);
+            const grandPaid  = filtered.reduce((s, i) => s + (parseFloat(i.paid)  || 0), 0);
+
+            let html = `<div style="background:#e8f5e9; padding:10px; border-radius:8px; margin-bottom:12px; font-size:13px;">
+                <b>সময়কাল:</b> ${fromDate} থেকে ${toDate}<br>
+                <b>মোট মেমো:</b> ${filtered.length} &nbsp;|&nbsp;
+                <b>মোট বিক্রয়:</b> ${Math.round(grandTotal)}/- &nbsp;|&nbsp;
+                <b>মোট নগদ:</b> ${Math.round(grandPaid)}/-
+            </div>`;
+
+            if (!Object.keys(byUser).length) {
+                html += '<p style="text-align:center; color:#999;">এই সময়ে কোনো বিক্রয় নেই।</p>';
+            } else {
+                html += '<table style="width:100%; border-collapse:collapse; font-size:13px;">';
+                html += '<tr style="background:#1a237e; color:white; text-align:center;"><th style="padding:8px;">বিক্রেতা</th><th>মেমো</th><th>বিক্রয়</th><th>নগদ</th><th>বাকি</th></tr>';
+                Object.entries(byUser)
+                    .sort((a, b) => b[1].total - a[1].total)
+                    .forEach(([name, data], i) => {
+                        html += `<tr style="background:${i%2===0?'#f5f5f5':'white'}; text-align:center;">
+                            <td style="padding:8px; font-weight:bold; text-align:left;">${name}</td>
+                            <td>${data.count}</td>
+                            <td>${Math.round(data.total)}/-</td>
+                            <td style="color:#2e7d32;">${Math.round(data.paid)}/-</td>
+                            <td style="color:${data.due > 0 ? '#d32f2f' : '#2e7d32'};">${Math.round(data.due)}/-</td>
+                        </tr>`;
+                    });
+                html += '</table>';
+            }
+
+            document.getElementById('sr-result').innerHTML = html;
+        }
+
+        window.onkeydown = e => {
+            if (e.key === "F2") {
+                e.preventDefault();
+                addNewItemRow();
+            }
+            if (e.key === "F4") {
+                e.preventDefault();
+                addReturnItemRow();
+            }
+            if (e.key === "Enter" && e.target.tagName !== "TEXTAREA") {
+                // PIN input — শুধু এখানেই checkPass
+                if (e.target.id === 'pass-input') {
+                    e.preventDefault();
+                    checkPass();
+                    return;
+                }
+                // যেকোনো INPUT বা BUTTON বা SELECT এ Enter চাপলে form submit হবে না
+                // শুধু body/document level Enter-এ invoice save হবে
+                const tag = document.activeElement.tagName;
+                const typ = (document.activeElement.type || '').toLowerCase();
+                if (tag === 'INPUT' || tag === 'SELECT' || tag === 'BUTTON' || tag === 'A') return;
+                // Login overlay খোলা থাকলে checkPass, নইলে save invoice
+                if (document.getElementById('auth-overlay').style.display !== 'none') checkPass();
+                else sendInvoiceRequest();
+            }
+        };
+    </script>
+</body>
+
+</html>
+
