@@ -2125,6 +2125,7 @@
                     );
                     db.ref(`${CB}/customers/${custKey}/lastActivity`).set(Date.now());
                     bkToast('', '📒', 'বাকি খাতা আপডেট', `${inv.name} — বাকি #${id} বাতিল হয়েছে`);
+                    bkSend('cancel_entry', { memoId: id, custKey, amount: parseFloat(inv.due) });
                 }
 
                 // UI আপডেট
