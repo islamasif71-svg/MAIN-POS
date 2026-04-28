@@ -2261,6 +2261,9 @@
                 return {
                     name: inv.name,
                     phone: inv.phone || (cur && cur.phone) || '',
+                    // ✅ Fix: address ও createdAt রক্ষা করো — Baki Khata-র সাথে consistent রাখার জন্য
+                    address: (cur && cur.address) || '',
+                    createdAt: (cur && cur.createdAt) || Date.now(),
                     totalDue: Math.round(((cur && cur.totalDue) || 0) + parseFloat(inv.due)),
                     lastActivity: Date.now()
                 };
