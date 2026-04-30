@@ -1740,7 +1740,7 @@
 
             // ── Helper: invoice object তৈরি করো ──
             const buildInvoice = (id, items, seller) => ({
-                id, date: getToday(),
+                id, date: _editingOldInvoice ? _editingOldInvoice.date : getToday(),
                 name: document.getElementById('cust-name').value || "নগদ",
                 phone: document.getElementById('cust-phone').value || "",
                 subTotal: sub, discType: document.getElementById('disc-type').value,
