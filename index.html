@@ -5,11 +5,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>হাজী মোদাচ্ছের ক্লথ স্টোর - সিকিউর POS v8</title>
+    <title>হাজী মোদাচ্ছের ক্লথ স্টোর - সিকিউর POS v11</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-    <script src="https://unpkg.com/html5-qrcode"></script>
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
     <style>
         /* ═══════════════════════════════════════ CSS ═══════════════════════════════════════ */
         :root {
@@ -90,7 +90,7 @@
                 0 0 40px rgba(212,175,55,0.08),
                 0 40px 80px rgba(0,0,0,0.7),
                 inset 0 1px 0 rgba(212,175,55,0.15);
-            width: 360px;
+            width: min(360px, 92vw);
             text-align: center;
             border: none;
         }
@@ -1264,17 +1264,17 @@
             let url = document.getElementById('new-link-url').value.trim();
             if (!name || !url) return alert("দয়া করে নাম ও লিঙ্ক উভয়ই দিন");
             if (!url.startsWith('http')) url = 'https://' + url;
-            db.ref('management_links').push({
-                name,
-                url
-            }).then(() => {
-                document.getElementById('new-link-name').value = "";
-                document.getElementById('new-link-url').value = "";
-            });
+            db.ref('management_links').push({ name, url })
+                .then(() => {
+                    document.getElementById('new-link-name').value = "";
+                    document.getElementById('new-link-url').value = "";
+                })
+                .catch(() => alert('❌ লিঙ্ক সেভ হয়নি! আবার চেষ্টা করুন।'));
         }
 
         function deleteLink(key) {
-            if (confirm("ডিলিট করবেন?")) db.ref('management_links/' + key).remove();
+            if (confirm("ডিলিট করবেন?")) db.ref('management_links/' + key).remove()
+                .catch(() => alert('❌ ডিলিট হয়নি! আবার চেষ্টা করুন।'));
         }
 
         const getToday = () => new Intl.DateTimeFormat('en-CA', {
@@ -1298,25 +1298,79 @@
             });
         }
 
-        // Login screen init — ইউজার লোড করো, না থাকলে default admin তৈরি করো
+        // Login screen init — ইউজার লোড করো, না থাকলে first-time setup দেখাও
         loadUsers(() => {
             if (!Object.keys(_allUsers).length) {
-                db.ref('pos_users').push({
-                    name: 'অ্যাডমিন',
-                    pin: '2255',
-                    role: 'admin',
-                    createdAt: Date.now()
-                });
+                _showFirstTimeSetup();
             }
         });
 
+        function _showFirstTimeSetup() {
+            // Login form লুকাও
+            document.getElementById('pass-input').style.display    = 'none';
+            document.querySelector('.login-btn').style.display      = 'none';
+            document.querySelector('.role-selector').style.display  = 'none';
+            document.getElementById('login-error').style.display    = 'none';
+            // Setup form তৈরি করো
+            const card = document.querySelector('.login-card');
+            const el   = document.createElement('div');
+            el.id      = 'first-setup-box';
+            el.innerHTML = `
+                <h3 style="color:#ffd600;margin:0 0 6px 0;">⚙️ প্রথমবার সেটআপ</h3>
+                <p style="font-size:13px;color:rgba(255,255,255,0.65);margin-bottom:18px;">প্রথম অ্যাডমিন অ্যাকাউন্ট তৈরি করুন</p>
+                <input type="text" id="setup-name" placeholder="অ্যাডমিনের নাম"
+                    style="width:100%;padding:12px;margin-bottom:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.07);color:white;font-size:15px;box-sizing:border-box;text-align:center;">
+                <input type="password" id="setup-pin" placeholder="পিন কোড (কমপক্ষে ৪ সংখ্যা)" maxlength="10"
+                    style="width:100%;padding:12px;margin-bottom:8px;border-radius:10px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.07);color:white;font-size:15px;box-sizing:border-box;text-align:center;">
+                <input type="password" id="setup-pin2" placeholder="পিন আবার লিখুন" maxlength="10"
+                    style="width:100%;padding:12px;margin-bottom:14px;border-radius:10px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.07);color:white;font-size:15px;box-sizing:border-box;text-align:center;">
+                <button onclick="_createFirstAdmin()"
+                    style="width:100%;padding:14px;border-radius:10px;border:none;background:var(--blue);color:white;font-weight:bold;font-size:16px;cursor:pointer;">✅ সেটআপ সম্পন্ন করুন</button>
+                <p id="setup-error" style="color:#ff5252;font-size:13px;margin-top:10px;display:none;"></p>`;
+            card.appendChild(el);
+        }
+
+        function _createFirstAdmin() {
+            const name  = (document.getElementById('setup-name').value  || '').trim();
+            const pin   = (document.getElementById('setup-pin').value   || '').trim();
+            const pin2  = (document.getElementById('setup-pin2').value  || '').trim();
+            const errEl =  document.getElementById('setup-error');
+            errEl.style.display = 'none';
+            if (!name)          { errEl.textContent = '❌ নাম দিন!'; errEl.style.display = 'block'; return; }
+            if (pin.length < 4) { errEl.textContent = '❌ পিন কমপক্ষে ৪ সংখ্যার হতে হবে!'; errEl.style.display = 'block'; return; }
+            if (pin !== pin2)   { errEl.textContent = '❌ পিন দুটো মিলছে না!'; errEl.style.display = 'block'; return; }
+            db.ref('pos_users').push({ name, pin, role: 'admin', createdAt: Date.now() })
+                .then(() => {
+                    alert(`✅ অ্যাডমিন "${name}" তৈরি হয়েছে! এখন লগইন করুন।`);
+                    document.getElementById('first-setup-box').remove();
+                    document.getElementById('pass-input').style.display   = '';
+                    document.querySelector('.login-btn').style.display     = '';
+                    document.querySelector('.role-selector').style.display = '';
+                    loadUsers();
+                })
+                .catch(() => {
+                    errEl.textContent = '❌ সমস্যা হয়েছে! Firebase সংযোগ চেক করুন।';
+                    errEl.style.display = 'block';
+                });
+        }
+
+        let _loginAttempts    = 0;
+        let _loginLockedUntil = 0;
+
         function checkPass() {
+            // Brute force চেক
+            const now = Date.now();
+            if (_loginLockedUntil > now) {
+                const secs = Math.ceil((_loginLockedUntil - now) / 1000);
+                const errEl = document.getElementById('login-error');
+                errEl.textContent  = `🔒 ${secs} সেকেন্ড অপেক্ষা করুন, তারপর আবার চেষ্টা করুন।`;
+                errEl.style.display = 'block';
+                return;
+            }
             const pin = document.getElementById('pass-input').value.trim();
             if (!pin) return;
             const errEl = document.getElementById('login-error');
             errEl.style.display = 'none';
-
-            // _allUsers খালি থাকলে আবার লোড করে চেক করো
             if (!Object.keys(_allUsers).length) {
                 loadUsers(() => _doCheckPass(pin, errEl));
             } else {
@@ -1334,12 +1388,22 @@
                     break;
                 }
             }
-
             if (matched) {
+                _loginAttempts    = 0;
+                _loginLockedUntil = 0;
                 currentUser = { name: matched.name, pin: matched.pin, role: matched.role || 'user', key: matched.key };
                 isAdmin = (currentUser.role === 'admin');
                 enterApp();
             } else {
+                _loginAttempts++;
+                if (_loginAttempts >= 5) {
+                    _loginLockedUntil = Date.now() + 60000; // ১ মিনিট লক
+                    _loginAttempts    = 0;
+                    errEl.textContent  = '🔒 ৫ বার ভুল পিন! ১ মিনিট অপেক্ষা করুন।';
+                } else {
+                    const remaining = 5 - _loginAttempts;
+                    errEl.textContent  = `❌ ভুল পিন! আরো ${remaining} বার চেষ্টার সুযোগ আছে।`;
+                }
                 errEl.style.display = 'block';
                 document.getElementById('pass-input').value = '';
                 document.getElementById('pass-input').focus();
@@ -1353,10 +1417,7 @@
 
         function logoutUser() {
             if (!confirm('লগআউট করবেন?')) return;
-            // এডিট মোডে logout হলে counter পুনরুদ্ধার করো
-            if (_editRestoreCounter !== null && _editingOldInvoice) {
-                db.ref('invoice_counter').set(_editRestoreCounter);
-            }
+            // এডিট মোডে logout হলে — counter পরিবর্তন আর করা হয় না (Bug #1 Fix)
             // সব Firebase realtime listener detach করো
             db.ref('invoices').off();
             db.ref('invoice_counter').off();
@@ -1370,9 +1431,9 @@
             _creditCacheListenerActive  = false;
             _inventoryLiveListenerOn    = false; // inventory listener guard reset
             _inventoryCache             = null;  // inventory cache clear
+            _inventoryCbQueue           = [];    // pending callbacks clear
             // edit state clear করো
             _editingOldInvoice  = null;
-            _editRestoreCounter = null;
             currentUser = { name: '', pin: '', role: 'user' };
             isAdmin = false;
             document.getElementById('main-app').style.display = 'none';
@@ -1432,10 +1493,32 @@
                             listEl.innerHTML = "কোন রিকোয়েস্ট নেই।";
                             return;
                         }
-                        listEl.innerHTML = Object.keys(requests).map(key => {
+                        // HTML injection ঠেকাতে textContent দিয়ে safe render
+                        listEl.innerHTML = '';
+                        Object.keys(requests).forEach(key => {
                             const req = requests[key];
-                            return `<div style="background:white; padding:8px; border-radius:5px; margin-bottom:5px; border:1px solid #ddd; font-size:13px;"> <b>#${req.id}</b> - ${req.name} (${req.total}/-) <div style="margin-top:5px;"> <button onclick="loadRequestForEdit('${key}')" style="background:var(--blue); color:white; border:none; padding:3px 8px; cursor:pointer; border-radius:3px;">এডিট ও অনুমোদন</button> <button onclick="rejectRequest('${key}')" style="background:var(--red); color:white; border:none; padding:3px 8px; cursor:pointer; border-radius:3px;">বাতিল</button> </div> </div>`;
-                        }).join('');
+                            const div = document.createElement('div');
+                            div.style.cssText = 'background:white;padding:8px;border-radius:5px;margin-bottom:5px;border:1px solid #ddd;font-size:13px;';
+                            const info = document.createElement('b');
+                            info.textContent = `#${req.id} — ${req.name || ''} (${req.total || 0}/-)`;
+                            const acts = document.createElement('div');
+                            acts.style.marginTop = '5px';
+                            const editBtn = document.createElement('button');
+                            editBtn.textContent = 'এডিট ও অনুমোদন';
+                            editBtn.style.cssText = 'background:var(--blue);color:white;border:none;padding:3px 8px;cursor:pointer;border-radius:3px;margin-right:4px;';
+                            editBtn.dataset.key = key;
+                            editBtn.onclick = () => loadRequestForEdit(editBtn.dataset.key);
+                            const rejBtn = document.createElement('button');
+                            rejBtn.textContent = 'বাতিল';
+                            rejBtn.style.cssText = 'background:var(--red);color:white;border:none;padding:3px 8px;cursor:pointer;border-radius:3px;';
+                            rejBtn.dataset.key = key;
+                            rejBtn.onclick = () => rejectRequest(rejBtn.dataset.key);
+                            acts.appendChild(editBtn);
+                            acts.appendChild(rejBtn);
+                            div.appendChild(info);
+                            div.appendChild(acts);
+                            listEl.appendChild(div);
+                        });
                     }
                 });
             }
@@ -1533,7 +1616,7 @@
         }
 
         function addNewItemRow(pName = "", pQty = 1, pPrice = "", sID = "") {
-            const rowId = 'row-' + Date.now() + Math.random().toString(36).substr(2, 5);
+            const rowId = 'row-' + Date.now() + Math.random().toString(36).substring(2, 7);
             const row = document.createElement('div');
             row.className = 'item-row';
             row.id = rowId;
@@ -1553,7 +1636,7 @@
         }
 
         function addReturnItemRow(pQty = 1, pPrice = "", sID = "") {
-            const rowId = 'row-' + Date.now() + Math.random().toString(36).substr(2, 5);
+            const rowId = 'row-' + Date.now() + Math.random().toString(36).substring(2, 7);
             const row = document.createElement('div');
             row.className = 'item-row';
             row.id = rowId;
@@ -1602,8 +1685,11 @@
             let grand = sub - discAmt;
             if (grand < 0) grand = 0; // ছাড় subtotal-এর বেশি হলে ০ করো
             let paid = parseFloat(document.getElementById('paid-amt').value) || 0;
-            // FIX: paid > grand হলে due নেগেটিভ হওয়া ঠেকাও
-            if (paid > grand) paid = grand;
+            // FIX: paid > grand হলে due নেগেটিভ হওয়া ঠেকাও + DOM আপডেট করো
+            if (paid > grand) {
+                paid = grand;
+                document.getElementById('paid-amt').value = Math.round(paid);
+            }
             let due = Math.max(0, grand - paid);
             document.getElementById('due-amt').value  = Math.round(due);
             document.getElementById('grand-display').innerText = "সর্বমোট: " + Math.round(grand) + "/-";
@@ -1632,16 +1718,25 @@
             const collectItems = () => {
                 const items = [];
                 document.querySelectorAll('.item-row').forEach(r => {
+                    const name = r.querySelector('.p-name').value.trim();
+                    if (!name) return; // ← সম্পূর্ণ খালি নামের সারি বাদ দাও
                     const sid = r.dataset.sid || "";
                     items.push({
                         id: sid, sid,
-                        name: r.querySelector('.p-name').value,
-                        qty: parseFloat(r.querySelector('.p-qty').value) || 0,   // FIX: parseFloat (আগে parseInt ছিল)
+                        name,
+                        qty: parseFloat(r.querySelector('.p-qty').value) || 0,
                         price: parseFloat(r.querySelector('.p-price').value) || 0
                     });
                 });
                 return items;
             };
+
+            // ── Validation: collectItems করার পর চেক করো ──
+            const _rawItems = collectItems();
+            const _zeroPriceItems = _rawItems.filter(i => i.price === 0 && !i.name.includes("মাল ফেরত"));
+            if (_zeroPriceItems.length) {
+                return alert(`❌ এই পণ্যের মূল্য লিখুন:\n${_zeroPriceItems.map(i => '• ' + i.name).join('\n')}`);
+            }
 
             // ── Helper: invoice object তৈরি করো ──
             const buildInvoice = (id, items, seller) => ({
@@ -1682,7 +1777,8 @@
                 // Temp ID ব্যবহার করো — admin approve করলে আসল ID পাবে
                 const tempId = 'P' + Date.now();
                 const pendingData = buildInvoice(tempId, items, currentUser.name);
-                db.ref('pending_requests').push(pendingData);
+                db.ref('pending_requests').push(pendingData)
+                    .catch(() => alert('❌ রিকোয়েস্ট পাঠাতে সমস্যা হয়েছে! ইন্টারনেট চেক করুন।'));
                 // Apps Script-এ backup করো (pending handler আছে)
                 fetch(SHEET_URL, {
                     method: 'POST',
@@ -1726,13 +1822,24 @@
             // ════════════════════════════════════════════
             // ── ADMIN: সরাসরি সেভ (নতুন বা এডিট) ──
             // ════════════════════════════════════════════
-            getNextInvoiceID((newId) => {
+            if (_editingOldInvoice) {
+                // ── এডিট মোড: পুরনো মেমোর একই ID সরাসরি ব্যবহার করো ──
+                // Counter ছোঁয়া হচ্ছে না → page refresh হলেও counter নষ্ট হবে না
+                const editId = _editingOldInvoice.id;
                 const items = collectItems();
-                const invoiceData = buildInvoice(newId, items, currentUser.name);
-                applyEditCleanup(); // এডিট মোডে: পুরনো স্টক ফেরত ও মেমো ডিলিট (save নিশ্চিত হওয়ার পর)
+                const invoiceData = buildInvoice(editId, items, currentUser.name);
+                applyEditCleanup();
                 items.forEach(item => reduceStock(item.id || item.sid, item.qty, item.name.includes("মাল ফেরত")));
                 finalizeInvoice(invoiceData);
-            });
+            } else {
+                getNextInvoiceID((newId) => {
+                    const items = collectItems();
+                    const invoiceData = buildInvoice(newId, items, currentUser.name);
+                    applyEditCleanup();
+                    items.forEach(item => reduceStock(item.id || item.sid, item.qty, item.name.includes("মাল ফেরত")));
+                    finalizeInvoice(invoiceData);
+                });
+            }
         }
 
         function _roundInvoice(data) {
@@ -1766,7 +1873,8 @@
                 timeZone: 'Asia/Dhaka'
             });
             const memoHtml = ` <div style="width:58mm; font-family: 'Arial', sans-serif; font-size:12px; padding:5px; background:white; color:#000;"> <center> <b style="font-size:18px;">হাজী মোদাচ্ছের ক্লথ স্টোর</b><br> <span style="font-size:11px;">সন্দীপ কমপ্লেক্স, চট্টগ্রাম<br>মোবাইল: ০১৭০৯-৩৪২০১৮</span><br> <div style="border-top:1px dashed #000; margin: 5px 0;"></div> </center> <table width="100%" style="font-size:11px; margin-bottom: 5px;"> <tr><td>রশিদ: <b>#${data.id}</b></td><td align="right">তারিখ: ${bdFullTime.split(',')[0]}</td></tr> <tr><td colspan="2">ক্রেতা: ${data.name} ${data.phone ? ' (' + data.phone + ')' : ''}</td></tr> <tr><td colspan="2" style="font-size:10px; color:#555;">বিক্রেতা: ${data.seller || currentUser.name || ''}</td></tr> </table> <table width="100%" style="font-size:11px; border-collapse: collapse;"> <tr style="border-bottom: 1px solid #000; font-weight: bold;"><td align="left">বিবরণ</td><td align="center">পরিমাণ</td><td align="right">মূল্য</td></tr> ${itemsHtml} </table> <div style="border-top:1px dashed #000; margin: 5px 0;"></div> <table width="100%" style="font-size:12px; font-weight: bold;"> <tr><td>মোট বিল:</td><td align="right">${Math.round(data.subTotal)}/-</td></tr> <tr><td>ছাড়:</td><td align="right">(-) ${Math.round(data.discAmt)}/-</td></tr> <tr style="font-size:14px;"><td>সর্বমোট:</td><td align="right">${Math.round(data.total)}/-</td></tr> <tr><td>জমা:</td><td align="right">${Math.round(data.paid || 0)}/-</td></tr> <tr style="color: ${data.due > 0 ? 'red' : 'black'};"><td>বাকি:</td><td align="right">${Math.round(data.due || 0)}/-</td></tr> </table> <div style="border-top:1px solid #000; margin: 8px 0 5px 0;"></div> <center> <p style="font-size:10px; margin: 3px 0;"><b>শর্তাবলী:</b></p> <ul style="font-size:9px; text-align: left; padding-left: 15px; margin: 0;"> <li>বিক্রিত পণ্য ৩ দিনের মধ্যে পরিবর্তনযোগ্য।</li> <li>ব্যবহৃত বা ধোয়া মাল ফেরত/পরিবর্তন হয় না।</li> </ul> <div class="qr-code-div" style="margin-top: 10px; display: flex; justify-content: center;"></div> <p style="font-size:10px; margin-top: 5px; font-weight: bold;">ধন্যবাদ, আবার আসবেন!</p> </center> </div>`;
-            db.ref('invoices/' + data.id).set({ ...data, html: memoHtml });
+            db.ref('invoices/' + data.id).set({ ...data, html: memoHtml })
+                .catch(() => bkToast('error', '⚠️', 'মেমো সেভ সমস্যা', `মেমো #${data.id} Firebase-এ সেভ হয়নি! Backup-এ আছে।`));
             // ══ CREDIT BOOK SYNC ══
             if (_editingOldInvoice) {
                 const oldDue = parseFloat(_editingOldInvoice.due) || 0;
@@ -1780,11 +1888,6 @@
                 _editingOldInvoice = null;
             } else if (parseFloat(data.due) > 0) {
                 addToCreditLedger(data);
-            }
-            // এডিট মোডে save হলে counter আসল জায়গায় ফিরিয়ে দাও
-            if (_editRestoreCounter !== null) {
-                db.ref('invoice_counter').set(_editRestoreCounter);
-                _editRestoreCounter = null;
             }
             bkSet('saving', '⏳', 'ব্যাকআপ হচ্ছে...', 'মেমো #' + data.id + ' Sheet-এ যাচ্ছে', 'সেভ হচ্ছে...');
             bkSend("invoice", { ...data, html: memoHtml });
@@ -1835,16 +1938,11 @@
             document.getElementById('due-amt').value = "";
             document.getElementById('product-list-container').innerHTML = "";
             document.getElementById('barcode-input').value = "";
-            // ── এডিট মোড বাতিল: counter পুনরুদ্ধার করো ──
-            if (_editRestoreCounter !== null && _editingOldInvoice) {
-                db.ref('invoice_counter').set(_editRestoreCounter);
-            }
             // ── সব pending/edit state পরিষ্কার ──
             currentRequestKey   = null;
             _pendingOriginalId  = null;
             _originalSeller     = null;
             _editingOldInvoice  = null;
-            _editRestoreCounter = null;
             _selectedCustKey    = null; // credit book customer selection reset
             addNewItemRow();
             calculate();
@@ -1968,19 +2066,26 @@
             }
         }
         /* ── Product Autocomplete ── */
-        let _inventoryCache = null;
+        let _inventoryCache          = null;
         let _inventoryLiveListenerOn = false;
+        let _inventoryCbQueue        = []; // race condition guard
 
         function getInventoryCache(cb) {
-            if (_inventoryCache) { cb(_inventoryCache); return; }
+            if (_inventoryCache !== null) { cb(_inventoryCache); return; }
+            _inventoryCbQueue.push(cb);
+            // ইতিমধ্যে fetch চলছে — আবার শুরু করবে না
+            if (_inventoryCbQueue.length > 1) return;
             db.ref('inventory').once('value', snap => {
                 _inventoryCache = snap.val() || {};
-                // Live update cache on changes — একবারই attach করো
+                // Live listener — মাত্র একবারই attach হবে
                 if (!_inventoryLiveListenerOn) {
                     _inventoryLiveListenerOn = true;
                     db.ref('inventory').on('value', s => { _inventoryCache = s.val() || {}; });
                 }
-                cb(_inventoryCache);
+                // সব queued callback চালাও
+                const queue = _inventoryCbQueue.slice();
+                _inventoryCbQueue = [];
+                queue.forEach(fn => fn(_inventoryCache));
             });
         }
 
@@ -2079,7 +2184,6 @@
         });
         /* ══ MEMO CANCEL & EDIT ══ */
         let currentPreviewInvoiceId = null;
-        let _editRestoreCounter = null; // এডিট করার আগে আসল counter সেভ রাখে
         let _editingOldInvoice = null;  // এডিট মোডে পুরনো মেমো ডেটা (বাকি হিসাবের জন্য)
         let _originalSeller = null;     // pending request-এর original seller সেভ রাখে
         let _pendingOriginalId = null;  // pending request-এর original invoice ID সেভ রাখে
@@ -2151,13 +2255,6 @@
 
                 // পুরনো ডেটা সংরক্ষণ করো — সেভ করার সময় ব্যবহার হবে
                 _editingOldInvoice = inv;
-
-                // ══ counter সেট: save হলে একই ID পাবে ══
-                // (তাৎক্ষণিক ডিলিট করা হচ্ছে না — browser crash হলেও মেমো নিরাপদ)
-                db.ref('invoice_counter').once('value', csnap => {
-                    _editRestoreCounter = csnap.val();
-                    db.ref('invoice_counter').set(Number(id) - 1);
-                });
 
                 // Form-এ লোড করো (এখনই কোনো ডিলিট বা স্টক পরিবর্তন নয়)
                 document.getElementById('cust-name').value  = inv.name     || '';
@@ -2752,12 +2849,11 @@
                 document.getElementById('new-user-pin').value = '';
                 alert(`✅ "${name}" যোগ করা হয়েছে!`);
                 renderUserList();
-                loadUsers(); // _allUsers আপডেট করো
-            });
+                loadUsers();
+            }).catch(() => alert('❌ ইউজার যোগ হয়নি! আবার চেষ্টা করুন।'));
         }
 
         function deleteUser(key, name) {
-            // নিজেকে ডিলিট করা থেকে বিরত রাখো
             if (key === currentUser.key) {
                 return alert('❌ নিজের অ্যাকাউন্ট ডিলিট করা যাবে না!\nঅন্য অ্যাডমিন থেকে করুন।');
             }
@@ -2765,14 +2861,13 @@
             db.ref('pos_users/' + key).remove().then(() => {
                 alert(`"${name}" ডিলিট হয়েছে।`);
                 renderUserList();
-            });
+            }).catch(() => alert('❌ ডিলিট হয়নি! আবার চেষ্টা করুন।'));
         }
 
         function changePinPrompt(key, name) {
             const newPin = prompt(`"${name}" এর নতুন পিন কোড লিখুন:`);
             if (!newPin || newPin.length < 4) return alert('পিন কমপক্ষে ৪ সংখ্যার হতে হবে!');
 
-            // Duplicate PIN চেক
             for (const k in _allUsers) {
                 if (k !== key && String(_allUsers[k].pin) === String(newPin)) {
                     return alert(`এই পিনটি "${_allUsers[k].name}" এর জন্য আগে থেকেই আছে!`);
@@ -2782,22 +2877,19 @@
             db.ref('pos_users/' + key + '/pin').set(newPin).then(() => {
                 alert(`✅ "${name}" এর পিন পরিবর্তন হয়েছে।`);
                 renderUserList();
-            });
+            }).catch(() => alert('❌ পিন পরিবর্তন হয়নি! আবার চেষ্টা করুন।'));
         }
 
         function changeAdminPin() {
             const newPin = document.getElementById('new-admin-pin').value.trim();
             if (!newPin || newPin.length < 4) return alert('পিন কমপক্ষে ৪ সংখ্যার হতে হবে!');
-
-            // নিজের (admin) key খুঁজো
             const adminKey = currentUser.key;
             if (!adminKey) return alert('অ্যাডমিন key পাওয়া যায়নি!');
-
             db.ref('pos_users/' + adminKey + '/pin').set(newPin).then(() => {
                 currentUser.pin = newPin;
                 document.getElementById('new-admin-pin').value = '';
                 alert('✅ অ্যাডমিন পিন পরিবর্তন হয়েছে। পরের বার নতুন পিন দিয়ে লগইন করুন।');
-            });
+            }).catch(() => alert('❌ পিন পরিবর্তন হয়নি! আবার চেষ্টা করুন।'));
         }
 
         /* ══════════════════════════════════════════════════════════
@@ -2890,7 +2982,7 @@
             document.getElementById('sr-result').innerHTML = html;
         }
 
-        window.onkeydown = e => {
+        window.addEventListener('keydown', e => {
             if (e.key === "F2") {
                 e.preventDefault();
                 addNewItemRow();
@@ -2915,7 +3007,7 @@
                 if (document.getElementById('auth-overlay').style.display !== 'none') checkPass();
                 else sendInvoiceRequest();
             }
-        };
+        });
     </script>
 </body>
 
