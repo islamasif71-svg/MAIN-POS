@@ -4,7 +4,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>হাজী মোদাচ্ছের ক্লথ স্টোর - সিকিউর POS v11</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
@@ -1938,7 +1938,7 @@
                     });
                 }
                 if (isAdmin) document.getElementById('re-print-btn').style.display = "block";
-                document.getElementById('whatsapp-btn').style.display = "block";
+                if (isAdmin) document.getElementById('whatsapp-btn').style.display = "block";
                 if (isAdmin && currentPreviewInvoiceId !== null) {
                     document.getElementById('cancel-memo-btn').style.display = 'block';
                     document.getElementById('edit-memo-btn').style.display = 'block';
@@ -2010,8 +2010,8 @@
                 document.getElementById('re-print-btn').style.display = 'block';
                 document.getElementById('cancel-memo-btn').style.display = 'block';
                 document.getElementById('edit-memo-btn').style.display = 'block';
+                document.getElementById('whatsapp-btn').style.display = 'block';
             }
-            document.getElementById('whatsapp-btn').style.display = 'block';
         }
 
         function showOld(id) {
@@ -2031,8 +2031,8 @@
                 document.getElementById('re-print-btn').style.display = 'block';
                 document.getElementById('cancel-memo-btn').style.display = 'block';
                 document.getElementById('edit-memo-btn').style.display = 'block';
+                document.getElementById('whatsapp-btn').style.display = 'block';
             }
-            document.getElementById('whatsapp-btn').style.display = 'block';
         }
 
         function updateDashboard() {
