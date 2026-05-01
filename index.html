@@ -2325,28 +2325,28 @@
 
             // ── মেসেজ তৈরি ──
             const itemLines = (inv.items || []).map(item =>
-                `▪ ${item.name} × ${item.qty} = ${Math.round(item.qty * item.price)}/-`
+                `${item.name} × ${item.qty} = ${Math.round(item.qty * item.price)}/-`
             ).join('\n');
 
             const due = Math.round(inv.due || 0);
-            const dueText = due > 0 ? `\n💳 বাকি: ${due}/-` : '\n✅ সম্পূর্ণ পরিশোধিত';
+            const dueText = due > 0 ? `\nবাকি: ${due}/-` : '\nসম্পূর্ণ পরিশোধিত';
 
             const msg =
-`🧾 *মেমো #${inv.id}*
-📅 তারিখ: ${inv.date || ''}
-👤 ক্রেতা: ${inv.name || ''}
+`*মেমো #${inv.id}*
+তারিখ: ${inv.date || ''}
+ক্রেতা: ${inv.name || ''}
 ─────────────────
 ${itemLines}
 ─────────────────
-💰 মোট বিল: ${Math.round(inv.subTotal || inv.total)}/-
-🏷 ছাড়: ${Math.round(inv.discAmt || 0)}/-
-💵 সর্বমোট: ${Math.round(inv.total)}/-
-✔️ জমা: ${Math.round(inv.paid || 0)}/-${dueText}
+মোট বিল: ${Math.round(inv.subTotal || inv.total)}/-
+ছাড়: ${Math.round(inv.discAmt || 0)}/-
+সর্বমোট: ${Math.round(inv.total)}/-
+জমা: ${Math.round(inv.paid || 0)}/-${dueText}
 ─────────────────
-📌 *হাজী মোদাচ্ছের ক্লথ স্টোর*
+*হাজী মোদাচ্ছের ক্লথ স্টোর*
 সন্দীপ কমপ্লেক্স, চট্টগ্রাম
-📞 ০১৭০৯-৩৪২০১৮
-🌐 fb.com/HaziModasserClothStore`;
+০১৭০৯-৩৪২০১৮
+fb.com/HaziModasserClothStore`;
 
             const url = `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
             window.open(url, '_blank');
