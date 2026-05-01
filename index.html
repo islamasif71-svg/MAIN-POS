@@ -945,7 +945,7 @@
         </div>
         <div class="status-bar admin-only">
             <div class="status-box">আজকের মেমো সংখ্যা<span id="stat-memo">০</span></div>
-            <div class="status-box">আজকের মোট জমা<span id="stat-today">০/-</span></div>
+            <div class="status-box">আজকের মোট বিক্রয়<span id="stat-today">০/-</span></div>
         </div>
         <div class="left-panel">
             <div style="display: grid; grid-template-columns: 1.5fr 1fr; gap: 10px; margin-bottom: 12px;">
@@ -988,8 +988,11 @@
                 <div class="calc-row"><label>বাকি:</label><input type="text" id="due-amt" readonly
                         style="background: #ffebee; color: var(--red);"></div>
                 <div class="final-total" id="grand-display">সর্বমোট: ০/-</div>
-            </div> <button class="btn-main" id="btn-save-request" onclick="sendInvoiceRequest()">অনুমোদনের জন্য পাঠান
-                (Enter)</button>
+            </div> 
+            <div style="display:flex; gap:8px;">
+                <button class="btn-main" id="btn-save-request" onclick="sendInvoiceRequest()" style="flex:1;">অনুমোদনের জন্য পাঠান</button>
+                <button class="btn-main admin-only" id="btn-save-whatsapp" onclick="_saveAndWhatsApp=true; sendInvoiceRequest();" style="flex:1;">সরাসরি সেভ ও WhatsApp</button>
+            </div>
         </div>
         <div class="right-panel">
             <div class="mgmt-box admin-only">
@@ -1026,6 +1029,8 @@
             <button id="re-print-btn" onclick="directPrintFromPreview()"
                 style="width:100%; padding:12px; margin-top:10px; display:none; background:var(--blue); color:white; border:none; border-radius:8px; cursor:pointer; font-weight:bold;">আবার
                 প্রিন্ট করুন</button>
+            <button id="whatsapp-btn" onclick="sendWhatsApp()"
+                style="width:100%; padding:12px; margin-top:6px; display:none; background:#25D366; color:white; border:none; border-radius:8px; cursor:pointer; font-weight:bold;">📲 WhatsApp এ পাঠান</button>
             <button id="cancel-memo-btn" onclick="cancelCurrentMemo()"
                 style="width:100%; padding:10px; margin-top:6px; display:none; background:var(--red); color:white; border:none; border-radius:8px; cursor:pointer; font-weight:bold;">❌ মেমো বাতিল (স্টক ফেরত + মুছে যাবে)</button>
             <button id="edit-memo-btn" onclick="editCurrentMemo()"
@@ -1105,6 +1110,8 @@
         let allInvoices = [],
             isAdmin = false,
             currentRequestKey = null;
+        let _currentInvoiceData = null; // WhatsApp পাঠানোর জন্য সর্বশেষ মেমো ডেটা
+        let _saveAndWhatsApp = false;   // সেভ করার পর WhatsApp খুলবে কিনা
         let currentUser = { name: '', pin: '', role: 'user' }; // লগইন হওয়া ইউজার
         let _allUsers = {}; // Firebase থেকে লোড হওয়া সব ইউজার
         let html5QrCode = null;
@@ -1452,7 +1459,7 @@
                 if (!isAdmin) { el.style.display = 'none'; return; }
                 el.style.display = el.classList.contains('status-bar') ? 'grid' : 'block';
             });
-            document.getElementById('btn-save-request').innerText = isAdmin ? "সরাসরি সেভ ও প্রিন্ট (Enter)" : "অনুমোদনের জন্য পাঠান (Enter)";
+            document.getElementById('btn-save-request').innerText = isAdmin ? "সরাসরি সেভ ও প্রিন্ট" : "অনুমোদনের জন্য পাঠান";
             // Header-এ user name দেখাও
             const role = isAdmin ? '🔑 অ্যাডমিন' : '👤 ইউজার';
             document.getElementById('logged-user-name').textContent = `${role}: ${currentUser.name}`;
@@ -1892,7 +1899,16 @@
             bkSet('saving', '⏳', 'ব্যাকআপ হচ্ছে...', 'মেমো #' + data.id + ' Sheet-এ যাচ্ছে', 'সেভ হচ্ছে...');
             bkSend("invoice", { ...data, html: memoHtml });
             currentPreviewInvoiceId = data.id;
-            printMemo(memoHtml, data.id);
+            _currentInvoiceData = data; // WhatsApp এর জন্য সেভ করো
+            if (_saveAndWhatsApp) {
+                // ── সেভ ও WhatsApp: প্রিন্ট নয়, শুধু preview দেখাও তারপর WhatsApp খোলো ──
+                _saveAndWhatsApp = false;
+                showMemoPreview({ ...data, html: memoHtml });
+                setTimeout(() => sendWhatsApp(), 400);
+            } else {
+                // ── সেভ ও প্রিন্ট: আগের মতো প্রিন্ট করো ──
+                printMemo(memoHtml, data.id);
+            }
             resetForm();
         }
 
@@ -1922,6 +1938,7 @@
                     });
                 }
                 if (isAdmin) document.getElementById('re-print-btn').style.display = "block";
+                document.getElementById('whatsapp-btn').style.display = "block";
                 if (isAdmin && currentPreviewInvoiceId !== null) {
                     document.getElementById('cancel-memo-btn').style.display = 'block';
                     document.getElementById('edit-memo-btn').style.display = 'block';
@@ -1978,6 +1995,7 @@
 
         function showMemoPreview(inv) {
             currentPreviewInvoiceId = inv.id;
+            _currentInvoiceData = inv; // WhatsApp এর জন্য সেভ করো
             document.getElementById('memo-preview').innerHTML = inv.html || 'HTML পাওয়া যায়নি';
             const qr = document.getElementById('memo-preview').querySelector('.qr-code-div');
             if (qr) {
@@ -1993,12 +2011,14 @@
                 document.getElementById('cancel-memo-btn').style.display = 'block';
                 document.getElementById('edit-memo-btn').style.display = 'block';
             }
+            document.getElementById('whatsapp-btn').style.display = 'block';
         }
 
         function showOld(id) {
             let inv = allInvoices.find(i => i.id == id);
             if (!inv) return alert('মেমো পাওয়া যায়নি!');
             currentPreviewInvoiceId = inv.id;
+            _currentInvoiceData = inv; // WhatsApp এর জন্য সেভ করো
             // FIX: html undefined হলে সারসংক্ষেপ দেখাও — crash এড়াও
             document.getElementById('memo-preview').innerHTML = inv.html ||
                 `<div style="padding:20px;text-align:center;color:#999;">মেমো #${inv.id} — HTML সংরক্ষিত নেই<br><small>তারিখ: ${inv.date} | ক্রেতা: ${inv.name} | মোট: ${inv.total}/-</small></div>`;
@@ -2012,6 +2032,7 @@
                 document.getElementById('cancel-memo-btn').style.display = 'block';
                 document.getElementById('edit-memo-btn').style.display = 'block';
             }
+            document.getElementById('whatsapp-btn').style.display = 'block';
         }
 
         function updateDashboard() {
@@ -2238,6 +2259,7 @@
                 document.getElementById('cancel-memo-btn').style.display = 'none';
                 document.getElementById('edit-memo-btn').style.display = 'none';
                 document.getElementById('re-print-btn').style.display = 'none';
+                document.getElementById('whatsapp-btn').style.display = 'none';
                 currentPreviewInvoiceId = null;
                 bkToast('error', '🗑', 'মেমো বাতিল ও ডিলিট', `মেমো #${id} মুছে গেছে, স্টক ফেরত গেছে`);
             });
@@ -2279,6 +2301,7 @@
                 document.getElementById('cancel-memo-btn').style.display = 'none';
                 document.getElementById('edit-memo-btn').style.display   = 'none';
                 document.getElementById('re-print-btn').style.display    = 'none';
+                document.getElementById('whatsapp-btn').style.display    = 'none';
                 currentPreviewInvoiceId = null;
                 bkToast('', '✏️', 'মেমো এডিট মোড', `মেমো #${id} লোড — সেভ করলে একই নম্বরে যাবে`);
                 window.scrollTo(0, 0);
@@ -2286,6 +2309,49 @@
         }
 
         /* ══ DARK MODE ══ */
+        function sendWhatsApp() {
+            const inv = _currentInvoiceData;
+            if (!inv) return alert('কোনো মেমো লোড নেই!');
+
+            // ── নম্বর নির্ধারণ ──
+            let phone = (inv.phone || '').replace(/\D/g, ''); // শুধু সংখ্যা রাখো
+            if (!phone) {
+                phone = prompt('ক্রেতার WhatsApp নম্বর দিন (যেমন: 01XXXXXXXXX):');
+                if (!phone) return;
+                phone = phone.replace(/\D/g, '');
+            }
+            // বাংলাদেশি নম্বর → আন্তর্জাতিক ফরম্যাট (88 যোগ)
+            if (phone.startsWith('0')) phone = '88' + phone;
+
+            // ── মেসেজ তৈরি ──
+            const itemLines = (inv.items || []).map(item =>
+                `▪ ${item.name} × ${item.qty} = ${Math.round(item.qty * item.price)}/-`
+            ).join('\n');
+
+            const due = Math.round(inv.due || 0);
+            const dueText = due > 0 ? `\n💳 বাকি: ${due}/-` : '\n✅ সম্পূর্ণ পরিশোধিত';
+
+            const msg =
+`🧾 *মেমো #${inv.id}*
+📅 তারিখ: ${inv.date || ''}
+👤 ক্রেতা: ${inv.name || ''}
+─────────────────
+${itemLines}
+─────────────────
+💰 মোট বিল: ${Math.round(inv.subTotal || inv.total)}/-
+🏷 ছাড়: ${Math.round(inv.discAmt || 0)}/-
+💵 সর্বমোট: ${Math.round(inv.total)}/-
+✔️ জমা: ${Math.round(inv.paid || 0)}/-${dueText}
+─────────────────
+📌 *হাজী মোদাচ্ছের ক্লথ স্টোর*
+সন্দীপ কমপ্লেক্স, চট্টগ্রাম
+📞 ০১৭০৯-৩৪২০১৮
+🌐 fb.com/HaziModasserClothStore`;
+
+            const url = `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
+            window.open(url, '_blank');
+        }
+
         function toggleDark() {
             const isDark = document.body.classList.toggle('dark-mode');
             document.getElementById('dark-toggle').textContent = isDark ? '☀️' : '🌙';
