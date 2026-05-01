@@ -994,7 +994,7 @@
                 <button class="btn-main admin-only" id="btn-save-whatsapp" onclick="_saveAndWhatsApp=true; sendInvoiceRequest();" style="flex:1;">সরাসরি সেভ ও WhatsApp</button>
             </div>
         </div>
-        <div class="right-panel">
+        <div class="right-panel" id="right-panel">
             <div class="mgmt-box admin-only">
                 <h4 class="mgmt-title">ম্যানেজমেন্ট প্যানেল</h4>
                 <div id="dynamic-link-container" class="link-btn-container"></div>
@@ -1454,6 +1454,9 @@
         function enterApp() {
             document.getElementById('auth-overlay').style.display = 'none';
             document.getElementById('main-app').style.display = 'grid';
+            // ── User → এক কলাম, Admin → দুই কলাম ──
+            document.getElementById('main-app').style.gridTemplateColumns = isAdmin ? '' : '1fr';
+            document.getElementById('right-panel').style.display = isAdmin ? '' : 'none';
             document.getElementById('bkBar').style.display = 'flex';
             document.querySelectorAll('.admin-only').forEach(el => {
                 if (!isAdmin) { el.style.display = 'none'; return; }
