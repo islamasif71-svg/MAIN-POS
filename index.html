@@ -6,6 +6,43 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>হাজী মোদাচ্ছের ক্লথ স্টোর - সিকিউর POS v11</title>
+    <link id="favicon" rel="icon" type="image/png">
+    <script>
+        // ── Animated Favicon (A & M লোগো) ──
+        (function() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 64; canvas.height = 64;
+            const ctx = canvas.getContext('2d');
+            let angle = 0;
+            function drawFavicon() {
+                ctx.clearRect(0, 0, 64, 64);
+                ctx.save();
+                ctx.translate(32, 32);
+                ctx.rotate(angle);
+                // বাইরের ডায়মন্ড — লাল
+                ctx.strokeStyle = '#e53935'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+                ctx.beginPath(); ctx.moveTo(0,-26); ctx.lineTo(26,0); ctx.lineTo(0,26); ctx.lineTo(-26,0); ctx.closePath(); ctx.stroke();
+                // ভেতরের ডায়মন্ড — বেগুনি
+                ctx.strokeStyle = '#7b1fa2'; ctx.lineWidth = 3;
+                ctx.beginPath(); ctx.moveTo(0,-18); ctx.lineTo(18,0); ctx.lineTo(0,18); ctx.lineTo(-18,0); ctx.closePath(); ctx.stroke();
+                ctx.restore();
+                // A লেখা — লাল
+                ctx.font = 'bold 22px Arial';
+                ctx.fillStyle = '#e53935';
+                ctx.fillText('A', 8, 40);
+                // & লেখা — নেভি
+                ctx.fillStyle = '#1a237e';
+                ctx.fillText('&', 24, 40);
+                // M লেখা — সবুজ
+                ctx.fillStyle = '#2e7d32';
+                ctx.fillText('M', 42, 40);
+                document.getElementById('favicon').href = canvas.toDataURL('image/png');
+                angle += 0.03;
+                requestAnimationFrame(drawFavicon);
+            }
+            window.addEventListener('load', drawFavicon);
+        })();
+    </script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
