@@ -1916,9 +1916,19 @@
                 const newDue = parseFloat(data.due) || 0;
                 const collected = Math.round(oldDue - newDue);
                 if (oldDue > 0 && collected > 0) {
-                    syncCreditPaymentFromEdit(_editingOldInvoice, data, collected);
+                    if (Math.round(data.total) < Math.round(_editingOldInvoice.total)) {
+                        // পণ্য বাদ গেছে → payment নয়, শুধু বাকি কমাও
+                        syncCreditDueDecrease(_editingOldInvoice, data, collected);
+                    } else {
+                        // বাকি পরিশোধ হয়েছে → payment রেকর্ড
+                        syncCreditPaymentFromEdit(_editingOldInvoice, data, collected);
+                    }
                 } else if (oldDue <= 0 && newDue > 0) {
+                    // নতুন বাকি যোগ → নতুন entry
                     addToCreditLedger(data);
+                } else if (oldDue > 0 && newDue > oldDue) {
+                    // ══ বাকি বাড়লো → Bakikhata entry আপডেট ══
+                    syncCreditDueIncrease(_editingOldInvoice, data, Math.round(newDue - oldDue));
                 }
                 _editingOldInvoice = null;
             } else if (parseFloat(data.due) > 0) {
@@ -2068,10 +2078,20 @@
             const todayEl = document.getElementById('stat-today');
             if (!memoEl || !todayEl) return;
             const todayStr = getToday();
-            const todayInvs = allInvoices.filter(i => i.date === todayStr);
+            // মেমো সংখ্যা: manual_baki ও payment_baki বাদ (শুধু আসল বিক্রয়)
+            const salesToday = allInvoices.filter(i => i.date === todayStr && i.source !== 'manual_baki' && i.source !== 'payment_baki');
             if (isAdmin) {
-                memoEl.innerText  = todayInvs.length;
-                todayEl.innerText = Math.round(todayInvs.reduce((s, i) => s + (parseFloat(i.paid) || 0), 0)) + "/-";
+                memoEl.innerText = salesToday.length;
+                // আসল বিক্রয়ের paid (নগদ)
+                const posPaid = Math.round(salesToday.reduce((s, i) => s + (parseFloat(i.paid) || 0), 0));
+                // বাকি আদায় → daily_receipts (payment_baki এখানেই আছে, double নয়)
+                Promise.all([
+                    db.ref(`${CB}/daily_receipts/${todayStr}`).once('value')
+                ]).then(([crSnap]) => {
+                    const creditCollected = crSnap.val() ? (crSnap.val().total || 0) : 0;
+                    // মোট = আসল বিক্রয় নগদ + বাকি আদায়
+                    todayEl.innerText = Math.round(posPaid + creditCollected) + "/-";
+                });
             }
         }
 
@@ -2514,6 +2534,54 @@ fb.com/HaziModasserClothStore`;
             bkSend('credit_payment', payData);
         }
 
+        /* মেমো এডিটে পণ্য বাদ গেলে বাকি কমাও — payment নয় */
+        function syncCreditDueDecrease(oldInv, newInv, decreased) {
+            if (!oldInv.name || oldInv.name === 'নগদ' || decreased <= 0) return;
+            const custKey = oldInv.custKey || makeCustKey(oldInv.name);
+
+            // Entry-তে originalDue ও remainingDue কমাও
+            db.ref(`${CB}/entries/${custKey}/${oldInv.id}`).transaction(cur => {
+                if (!cur) return cur;
+                const newOrig = Math.max(0, Math.round((cur.originalDue || 0) - decreased));
+                const newRem  = Math.max(0, Math.round((cur.remainingDue || 0) - decreased));
+                return { ...cur, originalDue: newOrig, remainingDue: newRem, status: newRem <= 0 ? 'cleared' : 'due' };
+            });
+
+            // Customer মোট বাকি কমাও
+            db.ref(`${CB}/customers/${custKey}/totalDue`).transaction(cur =>
+                Math.max(0, Math.round((cur || 0) - decreased))
+            );
+            db.ref(`${CB}/customers/${custKey}/lastActivity`).set(Date.now());
+
+            bkToast('', '📒', 'বাকি সংশোধন', `${oldInv.name} — বাকি -${decreased}/- (#${oldInv.id})`);
+            // কোনো payment record বা daily_receipts আপডেট নয়
+        }
+
+        /* মেমো এডিটে বাকি বাড়লে Bakikhata আপডেট */
+        function syncCreditDueIncrease(oldInv, newInv, increased) {
+            if (!oldInv.name || oldInv.name === 'নগদ' || increased <= 0) return;
+            const custKey = oldInv.custKey || makeCustKey(oldInv.name);
+
+            // Bakikhata entry-তে বাকি বাড়াও
+            db.ref(`${CB}/entries/${custKey}/${oldInv.id}`).transaction(cur => {
+                if (!cur) return cur;
+                return {
+                    ...cur,
+                    originalDue: Math.round((cur.originalDue || 0) + increased),
+                    remainingDue: Math.round((cur.remainingDue || 0) + increased),
+                    status: 'due'
+                };
+            });
+
+            // Customer মোট বাকি বাড়াও
+            db.ref(`${CB}/customers/${custKey}/totalDue`).transaction(cur =>
+                Math.round((cur || 0) + increased)
+            );
+            db.ref(`${CB}/customers/${custKey}/lastActivity`).set(Date.now());
+
+            bkToast('', '📒', 'বাকি আপডেট', `${oldInv.name} — বাকি +${increased}/- (#${oldInv.id})`);
+        }
+
         /* ══ CUSTOMER AUTOCOMPLETE FROM CREDIT BOOK ══════════════════════════ */
         let _creditCustomersCache = {};
 
@@ -2630,15 +2698,20 @@ fb.com/HaziModasserClothStore`;
         function showDailyReport() {
             if (!isAdmin) return;
             const date = document.getElementById('report-date').value;
-            const filtered = allInvoices.filter(i => i.date === date);
+            const filtered = allInvoices.filter(i => i.date === date && i.source !== 'manual_baki');
             const sumPaid = filtered.reduce((s, i) => s + (parseFloat(i.paid) || 0), 0);
             const sumTotal = filtered.reduce((s, i) => s + (parseFloat(i.total) || 0), 0);
             const sumDue = filtered.reduce((s, i) => s + (parseFloat(i.due) || 0), 0);
 
-            // Credit receipts for this date
-            db.ref(`${CB}/daily_receipts/${date}`).once('value', snap => {
-                const cr = snap.val();
+            // ══ Credit receipts + Credit entries উভয় এক সাথে নিই ══
+            Promise.all([
+                db.ref(`${CB}/daily_receipts/${date}`).once('value'),
+                db.ref(`${CB}/daily_credit_entries/${date}`).once('value')
+            ]).then(([crSnap, ceSnap]) => {
+                const cr = crSnap.val();
+                const ce = ceSnap.val();
                 const creditCollected = cr ? (cr.total || 0) : 0;
+                const creditEntries = ce ? (ce.total || 0) : 0;
                 const totalCash = Math.round(sumPaid + creditCollected);
 
                 let html = `<div style="line-height:1.9; font-size:13px;">
@@ -2646,6 +2719,9 @@ fb.com/HaziModasserClothStore`;
                     💰 মোট বিক্রয়: <b>${Math.round(sumTotal)}/-</b><br>
                     ✅ নগদ জমা (বিক্রয়): <b>${Math.round(sumPaid)}/-</b><br>
                     🔴 বাকি দেওয়া: <b>${Math.round(sumDue)}/-</b>`;
+                if (creditEntries > 0) {
+                    html += `<br>📝 বাকি খাতা এন্ট্রি: <b style="color:#7b1fa2;">${Math.round(creditEntries)}/-</b>`;
+                }
                 if (creditCollected > 0) {
                     html += `<br>💚 বাকি আদায় (আজ): <b style="color:green;">${Math.round(creditCollected)}/-</b>
                     <br><b style="color:#1e88e5;">📊 মোট নগদ প্রাপ্তি: ${totalCash}/-</b>`;
