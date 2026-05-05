@@ -1663,7 +1663,7 @@
                         oninput="searchProduct(event, '${rowId}')"
                         autocomplete="off">
                 </div>
-                <input type="number" class="p-qty" value="${pQty}" min="1" oninput="calculate()" onkeydown="handleQtyKey(event, '${rowId}')">
+                <input type="number" class="p-qty" value="${pQty}" min="0.01" step="0.01" oninput="calculate()" onkeydown="handleQtyKey(event, '${rowId}')">
                 <input type="number" class="p-price" value="${pPrice}" placeholder="মূল্য" oninput="calculate()" onkeydown="handlePriceKey(event, '${rowId}')">
                 <button style="color:var(--red); border:none; background:none; cursor:pointer; font-size:20px;" onclick="this.closest('.item-row').remove(); calculate();">×</button>`;
             document.getElementById('product-list-container').appendChild(row);
@@ -1683,7 +1683,7 @@
                         onkeydown="handleSearchKey(event, '${rowId}')"
                         style="color:var(--red); font-weight:bold;" readonly>
                 </div>
-                <input type="number" class="p-qty" value="${pQty}" min="1" oninput="calculate()" onkeydown="handleQtyKey(event, '${rowId}')">
+                <input type="number" class="p-qty" value="${pQty}" min="0.01" step="0.01" oninput="calculate()" onkeydown="handleQtyKey(event, '${rowId}')">
                 <input type="number" class="p-price" value="${pPrice}" placeholder="ফেরত মূল্য" oninput="calculate()" onkeydown="handlePriceKey(event, '${rowId}')" style="color:var(--red); font-weight:bold;">
                 <button style="color:var(--red); border:none; background:none; cursor:pointer; font-size:20px;" onclick="this.closest('.item-row').remove(); calculate();">×</button>`;
             document.getElementById('product-list-container').appendChild(row);
