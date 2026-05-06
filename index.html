@@ -1492,7 +1492,7 @@
             const role = isAdmin ? '🔑 অ্যাডমিন' : '👤 ইউজার';
             document.getElementById('logged-user-name').textContent = `${role}: ${currentUser.name}`;
             initApp();
-            initMgmtLinks();
+            if (isAdmin) initMgmtLinks(); // ── Management links শুধু Admin-এর জন্য ──
             initCreditCustomerCache();
             setTimeout(bkSendPending, 3000);
             if (isAdmin) setTimeout(bkDeleteOld, 5000);
@@ -1506,25 +1506,28 @@
             if (!_firebaseListenersActive) {
                 _firebaseListenersActive = true;
 
-                // ── শুধু শেষ ৩০ দিনের মেমো লোড — Bandwidth সাশ্রয় ──
-                const _30d = new Date(); _30d.setDate(_30d.getDate() - 30);
-                const _cutoff = _30d.toISOString().split('T')[0];
-                db.ref('invoices').orderByChild('date').startAt(_cutoff).on('value', snap => {
-                    const data = snap.val();
-                    allInvoices = data ? Object.values(data).sort((a, b) => {
-                        if (a.date < b.date) return -1;
-                        if (a.date > b.date) return 1;
-                        return (a.id || 0) - (b.id || 0);
-                    }) : [];
-                    updateDashboard();
-                });
+                // ── শুধু শেষ ৩০ দিনের মেমো লোড — শুধু Admin-এর জন্য (Bandwidth সাশ্রয়) ──
+                if (isAdmin) {
+                    const _30d = new Date(); _30d.setDate(_30d.getDate() - 30);
+                    const _cutoff = _30d.toISOString().split('T')[0];
+                    db.ref('invoices').orderByChild('date').startAt(_cutoff).on('value', snap => {
+                        const data = snap.val();
+                        allInvoices = data ? Object.values(data).sort((a, b) => {
+                            if (a.date < b.date) return -1;
+                            if (a.date > b.date) return 1;
+                            return (a.id || 0) - (b.id || 0);
+                        }) : [];
+                        updateDashboard();
+                    });
+                }
 
                 db.ref('invoice_counter').on('value', snap => {
                     document.getElementById('next-invoice-id').innerText = (snap.val() || 1000) + 1;
                 });
 
-                db.ref('pending_requests').on('value', snap => {
-                    if (isAdmin) {
+                // ── pending_requests শুধু Admin-এর জন্য — User-এর download বাঁচাতে ──
+                if (isAdmin) {
+                    db.ref('pending_requests').on('value', snap => {
                         const requests = snap.val();
                         const listEl = document.getElementById('pending-requests-list');
                         if (!requests) {
@@ -1557,8 +1560,8 @@
                             div.appendChild(acts);
                             listEl.appendChild(div);
                         });
-                    }
-                });
+                    });
+                }
             }
 
             if (document.getElementById('product-list-container').innerHTML === "") resetForm();
