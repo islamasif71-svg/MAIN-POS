@@ -1677,7 +1677,7 @@
                 <input type="number" class="p-price" value="${pPrice}" placeholder="মূল্য" oninput="calculate()" onkeydown="handlePriceKey(event, '${rowId}')">
                 <button style="color:var(--red); border:none; background:none; cursor:pointer; font-size:20px;" onclick="this.closest('.item-row').remove(); calculate();">×</button>`;
             document.getElementById('product-list-container').appendChild(row);
-            if (!pName) row.querySelector('.p-name').focus();
+            if (!pName) document.getElementById('barcode-input').focus();
         }
 
         function addReturnItemRow(pQty = 1, pPrice = "", sID = "") {
@@ -1697,7 +1697,7 @@
                 <input type="number" class="p-price" value="${pPrice}" placeholder="ফেরত মূল্য" oninput="calculate()" onkeydown="handlePriceKey(event, '${rowId}')" style="color:var(--red); font-weight:bold;">
                 <button style="color:var(--red); border:none; background:none; cursor:pointer; font-size:20px;" onclick="this.closest('.item-row').remove(); calculate();">×</button>`;
             document.getElementById('product-list-container').appendChild(row);
-            if (!pPrice) row.querySelector('.p-price').focus();
+            if (!pPrice) document.getElementById('barcode-input').focus();
         }
 
         function handleSearchKey(e, rowId) {
