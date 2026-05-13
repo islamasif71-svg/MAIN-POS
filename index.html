@@ -1728,14 +1728,16 @@
             let dVal  = parseFloat(document.getElementById('disc-val').value) || 0;
             let discAmt = dType === "percent" ? (sub * dVal / 100) : dVal;
             let grand = sub - discAmt;
-            if (grand < 0) grand = 0; // ছাড় subtotal-এর বেশি হলে ০ করো
+            // ছাড় subtotal-এর বেশি হলে ০ করো — কিন্তু ফেরত (sub<0) হলে grand negative থাকবে
+            if (grand < 0 && sub >= 0) grand = 0;
             let paid = parseFloat(document.getElementById('paid-amt').value) || 0;
-            // FIX: paid > grand হলে due নেগেটিভ হওয়া ঠেকাও + DOM আপডেট করো
-            if (paid > grand) {
+            // শুধু normal sale-এ paid cap করো; ফেরতে paid সাধারণত ০
+            if (sub >= 0 && paid > grand) {
                 paid = grand;
                 document.getElementById('paid-amt').value = Math.round(paid);
             }
-            let due = Math.max(0, grand - paid);
+            // ফেরতে due negative = দোকান ক্রেতাকে দেবে; normal sale-এ minimum ০
+            let due = sub < 0 ? (grand - paid) : Math.max(0, grand - paid);
             document.getElementById('due-amt').value  = Math.round(due);
             document.getElementById('grand-display').innerText = "সর্বমোট: " + Math.round(grand) + "/-";
             return { sub, grand, discAmt, paid, due };
@@ -1757,7 +1759,6 @@
         function sendInvoiceRequest() {
             let { sub, grand, discAmt, paid, due } = calculate();
             if (sub === 0) return alert("পণ্য ও সঠিক মূল্য দিন!");
-            if (sub < 0) return alert("শুধু মাল ফেরত দিয়ে ইনভয়েস করা যাবে না! বিক্রয় পণ্য যোগ করুন।");
 
             // ── Helper: form থেকে items সংগ্রহ করো ──
             const collectItems = () => {
@@ -1905,7 +1906,8 @@
 
             // ══ custKey: dropdown থেকে বাছাই হলে সেটা, নইলে নাম থেকে তৈরি করো ══
             // invoice-এ custKey সংরক্ষণ করো → cancelCurrentMemo সঠিক customer খুঁজে পাবে
-            const custKey = (parseFloat(data.due) > 0 && data.name !== "নগদ")
+            const _isReturnInvoice = parseFloat(data.total) < 0;
+            const custKey = (data.name && data.name !== "নগদ" && (parseFloat(data.due) > 0 || _isReturnInvoice))
                 ? (_selectedCustKey || makeCustKey(data.name))
                 : null;
             if (custKey) data.custKey = custKey;
@@ -1949,6 +1951,9 @@
                 _editingOldInvoice = null;
             } else if (parseFloat(data.due) > 0) {
                 addToCreditLedger(data);
+            } else if (_isReturnInvoice && custKey) {
+                // ══ ফেরত মেমো + নামের গ্রাহক → বাকি খাতায় মাইনাস ══
+                addReturnToCreditLedger(data, custKey);
             }
             bkSet('saving', '⏳', 'ব্যাকআপ হচ্ছে...', 'মেমো #' + data.id + ' Sheet-এ যাচ্ছে', 'সেভ হচ্ছে...');
             bkSend("invoice", { ...data, html: memoHtml, createdAt: Date.now() });
@@ -2662,6 +2667,66 @@ fb.com/HaziModasserClothStore`;
                 .replace(/[\.\$\#\[\]\/\\]/g, '')
                 .replace(/\s+/g, '_')
                 .substring(0, 50) || 'unknown';
+        }
+
+        /* ফেরত মেমো → বাকি খাতায় মাইনাস (গ্রাহকের totalDue কমাও) */
+        function addReturnToCreditLedger(inv, custKey) {
+            if (!custKey) return;
+            const returnAmt = Math.abs(Math.round(parseFloat(inv.total) || 0));
+            if (returnAmt <= 0) return;
+
+            const today = getToday();
+
+            // ── Customer totalDue কমাও (০-এর নিচে যাবে না) ──
+            db.ref(`${CB}/customers/${custKey}/totalDue`).transaction(cur =>
+                Math.max(0, Math.round((cur || 0) - returnAmt))
+            );
+            db.ref(`${CB}/customers/${custKey}/lastActivity`).set(Date.now());
+
+            // ── FIFO: সবচেয়ে পুরনো 'due'/'partial' entry খুঁজে কমাও ──
+            db.ref(`${CB}/entries/${custKey}`).orderByChild('date').once('value', snap => {
+                if (!snap.exists()) return;
+                let remaining = returnAmt;
+                const updates = {};
+                snap.forEach(child => {
+                    if (remaining <= 0) return;
+                    const e = child.val();
+                    if (e.status === 'due' || e.status === 'partial') {
+                        const oldRem = Math.round(e.remainingDue || 0);
+                        const deduct = Math.min(oldRem, remaining);
+                        const newRem = oldRem - deduct;
+                        updates[`${child.key}/remainingDue`] = newRem;
+                        updates[`${child.key}/status`] = newRem <= 0 ? 'cleared' : 'partial';
+                        remaining -= deduct;
+                    }
+                });
+                if (Object.keys(updates).length > 0) {
+                    db.ref(`${CB}/entries/${custKey}`).update(updates);
+                }
+            });
+
+            // ── Return entry সেভ করো (বাকি খাতায় দেখা যাবে) ──
+            const returnEntry = {
+                custKey,
+                memoId: inv.id,
+                memoRef: String(inv.id),
+                date: today,
+                custName: inv.name,
+                custPhone: inv.phone || '',
+                total: -returnAmt,
+                paid: 0,
+                originalDue: -returnAmt,
+                remainingDue: 0,
+                discAmt: 0,
+                note: `মেমো #${inv.id} মাল ফেরত`,
+                type: 'return',
+                status: 'cleared',
+                createdAt: Date.now()
+            };
+            db.ref(`${CB}/entries/${custKey}/ret_${inv.id}`).set(returnEntry);
+
+            bkToast('', '🔄', 'ফেরত — বাকি কমেছে', `${inv.name} — ফেরত: ${returnAmt}/- (#${inv.id})`);
+            bkSend('credit_entry', returnEntry);
         }
 
         /* নতুন বাকি মেমো → credit_ledger এ যোগ */
