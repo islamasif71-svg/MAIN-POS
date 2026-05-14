@@ -2190,6 +2190,7 @@ ${itemsHtml}
             alert('মেমো পাওয়া যায়নি!');
         }
 
+        let _dashCounter = 0; // stale response ঠেকাতে counter
         function updateDashboard() {
             const memoEl  = document.getElementById('stat-memo');
             const todayEl = document.getElementById('stat-today');
@@ -2199,16 +2200,27 @@ ${itemsHtml}
             const salesToday = allInvoices.filter(i => i.date === todayStr && i.source !== 'manual_baki' && i.source !== 'payment_baki');
             if (isAdmin) {
                 memoEl.innerText = salesToday.length;
-                // আসল বিক্রয়ের paid (নগদ)
-                const posPaid = Math.round(salesToday.reduce((s, i) => s + (parseFloat(i.paid) || 0), 0));
+                // ফেরত মেমো (total<0) → total যোগ করো (negative, তাই কমবে)
+                // স্বাভাবিক বিক্রয় → paid যোগ করো
+                const posPaid = Math.round(salesToday.reduce((s, i) => {
+                    const total = parseFloat(i.total) || 0;
+                    return total < 0 ? s + Math.round(total) : s + (parseFloat(i.paid) || 0);
+                }, 0));
+                // ── stale response ঠেকাও: এই call-এর counter ধরে রাখো ──
+                const myCount = ++_dashCounter;
                 // বাকি আদায় → daily_receipts (payment_baki এখানেই আছে, double নয়)
-                Promise.all([
-                    db.ref(`${CB}/daily_receipts/${todayStr}`).once('value')
-                ]).then(([crSnap]) => {
+                db.ref(`${CB}/daily_receipts/${todayStr}`).once('value').then(crSnap => {
+                    if (myCount !== _dashCounter) return; // পুরনো response — বাদ দাও
                     const creditCollected = crSnap.val() ? (crSnap.val().total || 0) : 0;
                     // মোট = আসল বিক্রয় নগদ + বাকি আদায়
                     todayEl.innerText = Math.round(posPaid + creditCollected) + "/-";
                 });
+
+                // ── Bug #1 Fix: আজকের report খোলা থাকলে স্বয়ংক্রিয় refresh ──
+                const reportDateEl = document.getElementById('report-date');
+                if (reportDateEl && reportDateEl.value === todayStr) {
+                    showDailyReport();
+                }
             }
         }
 
@@ -2445,6 +2457,7 @@ ${itemsHtml}
                 }).catch(() => {});
                 // Local array থেকে সরাও
                 allInvoices = allInvoices.filter(i => i.id != id);
+                updateDashboard();
 
                 // ══ পেমেন্ট রশিদ বাতিল: credit_ledger থেকে পেমেন্ট রিভার্স করো ══
                 if (inv.source === 'payment_baki' && inv.custKey) {
