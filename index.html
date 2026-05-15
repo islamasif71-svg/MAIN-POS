@@ -1041,8 +1041,11 @@
                 </div>
             </div>
             <div class="tool-box admin-only" style="background: #fff9c4; border-color: #fbc02d;">
-                <h4 style="color: #f57f17; margin-top:0;">তারিখ অনুযায়ী রিপোর্ট</h4> <input type="date"
-                    id="report-date" onchange="showDailyReport()">
+                <h4 style="color: #f57f17; margin-top:0;">তারিখ অনুযায়ী রিপোর্ট</h4>
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <input type="date" id="report-date" onchange="showDailyReport()" style="flex:1; padding:8px; border:1px solid #fbc02d; border-radius:6px; font-size:14px;">
+                    <button onclick="showDailyReport()" style="padding:8px 14px; font-size:13px; font-weight:bold; background:#f57f17; color:white; border:none; border-radius:6px; cursor:pointer; white-space:nowrap;">রিফ্রেশ</button>
+                </div>
                 <div id="report-result" style="font-weight: bold; margin-top:10px; color: #d84315;">তারিখ সিলেক্ট
                     করুন...</div>
                 <div id="report-list" style="max-height: 150px; overflow-y: auto; margin-top: 10px; font-size: 13px;">
@@ -2190,7 +2193,6 @@ ${itemsHtml}
             alert('মেমো পাওয়া যায়নি!');
         }
 
-        let _dashCounter = 0; // stale response ঠেকাতে counter
         function updateDashboard() {
             const memoEl  = document.getElementById('stat-memo');
             const todayEl = document.getElementById('stat-today');
@@ -2200,27 +2202,16 @@ ${itemsHtml}
             const salesToday = allInvoices.filter(i => i.date === todayStr && i.source !== 'manual_baki' && i.source !== 'payment_baki');
             if (isAdmin) {
                 memoEl.innerText = salesToday.length;
-                // ফেরত মেমো (total<0) → total যোগ করো (negative, তাই কমবে)
-                // স্বাভাবিক বিক্রয় → paid যোগ করো
-                const posPaid = Math.round(salesToday.reduce((s, i) => {
-                    const total = parseFloat(i.total) || 0;
-                    return total < 0 ? s + Math.round(total) : s + (parseFloat(i.paid) || 0);
-                }, 0));
-                // ── stale response ঠেকাও: এই call-এর counter ধরে রাখো ──
-                const myCount = ++_dashCounter;
+                // আসল বিক্রয়ের paid (নগদ)
+                const posPaid = Math.round(salesToday.reduce((s, i) => s + (parseFloat(i.paid) || 0), 0));
                 // বাকি আদায় → daily_receipts (payment_baki এখানেই আছে, double নয়)
-                db.ref(`${CB}/daily_receipts/${todayStr}`).once('value').then(crSnap => {
-                    if (myCount !== _dashCounter) return; // পুরনো response — বাদ দাও
+                Promise.all([
+                    db.ref(`${CB}/daily_receipts/${todayStr}`).once('value')
+                ]).then(([crSnap]) => {
                     const creditCollected = crSnap.val() ? (crSnap.val().total || 0) : 0;
                     // মোট = আসল বিক্রয় নগদ + বাকি আদায়
                     todayEl.innerText = Math.round(posPaid + creditCollected) + "/-";
                 });
-
-                // ── Bug #1 Fix: আজকের report খোলা থাকলে স্বয়ংক্রিয় refresh ──
-                const reportDateEl = document.getElementById('report-date');
-                if (reportDateEl && reportDateEl.value === todayStr) {
-                    showDailyReport();
-                }
             }
         }
 
@@ -2457,7 +2448,6 @@ ${itemsHtml}
                 }).catch(() => {});
                 // Local array থেকে সরাও
                 allInvoices = allInvoices.filter(i => i.id != id);
-                updateDashboard();
 
                 // ══ পেমেন্ট রশিদ বাতিল: credit_ledger থেকে পেমেন্ট রিভার্স করো ══
                 if (inv.source === 'payment_baki' && inv.custKey) {
