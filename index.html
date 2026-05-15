@@ -1044,7 +1044,7 @@
                 <h4 style="color: #f57f17; margin-top:0;">তারিখ অনুযায়ী রিপোর্ট</h4>
                 <div style="display:flex; align-items:center; gap:8px;">
                     <input type="date" id="report-date" onchange="showDailyReport()" style="flex:1; padding:8px; border:1px solid #fbc02d; border-radius:6px; font-size:14px;">
-                    <button onclick="showDailyReport()" style="padding:8px 14px; font-size:13px; font-weight:bold; background:#f57f17; color:white; border:none; border-radius:6px; cursor:pointer; white-space:nowrap;">রিফ্রেশ</button>
+                    <button onclick="showDailyReport()" onmousedown="this.style.background='#bf360c'" onmouseup="this.style.background='#f57f17'" onmouseleave="this.style.background='#f57f17'" ontouchstart="this.style.background='#bf360c'" ontouchend="this.style.background='#f57f17'" style="padding:8px 14px; font-size:13px; font-weight:bold; background:#f57f17; color:white; border:none; border-radius:6px; cursor:pointer; white-space:nowrap;">রিফ্রেশ</button>
                 </div>
                 <div id="report-result" style="font-weight: bold; margin-top:10px; color: #d84315;">তারিখ সিলেক্ট
                     করুন...</div>
