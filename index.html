@@ -483,11 +483,8 @@
             top: -50%;
             left: -50%;
             background: conic-gradient(#00f7ff, #7c3aed, #ec4899, #00f7ff);
-            animation: none;
-            z-index: -2;
-        }
-        .barcode-scanner-box.scanning::before {
             animation: rotateBorder 6s linear infinite;
+            z-index: -2;
         }
         .barcode-scanner-box::after {
             content: '';
@@ -1014,9 +1011,7 @@
                     id="next-invoice-id">...</span></div>
             <div class="barcode-scanner-box"> <input type="text" id="barcode-input" placeholder="বারকোড স্ক্যান করুন..."
                     style="background: white; font-weight: bold; border-color: var(--blue);"
-                    onkeydown="handleBarcodeScan(event)"
-                    onfocus="this.closest('.barcode-scanner-box').classList.add('scanning')"
-                    onblur="this.closest('.barcode-scanner-box').classList.remove('scanning')"> <button onclick="toggleCamera()"
+                    onkeydown="handleBarcodeScan(event)"> <button onclick="toggleCamera()"
                     style="background: var(--blue); color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; white-space: nowrap;">📷
                     ক্যামেরা</button> </div>
             <div id="reader"></div>
