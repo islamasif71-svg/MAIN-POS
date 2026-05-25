@@ -483,8 +483,11 @@
             top: -50%;
             left: -50%;
             background: conic-gradient(#00f7ff, #7c3aed, #ec4899, #00f7ff);
-            animation: rotateBorder 6s linear infinite;
+            animation: none;
             z-index: -2;
+        }
+        .barcode-scanner-box.scanning::before {
+            animation: rotateBorder 6s linear infinite;
         }
         .barcode-scanner-box::after {
             content: '';
@@ -1011,7 +1014,9 @@
                     id="next-invoice-id">...</span></div>
             <div class="barcode-scanner-box"> <input type="text" id="barcode-input" placeholder="বারকোড স্ক্যান করুন..."
                     style="background: white; font-weight: bold; border-color: var(--blue);"
-                    onkeydown="handleBarcodeScan(event)"> <button onclick="toggleCamera()"
+                    onkeydown="handleBarcodeScan(event)"
+                    onfocus="this.closest('.barcode-scanner-box').classList.add('scanning')"
+                    onblur="this.closest('.barcode-scanner-box').classList.remove('scanning')"> <button onclick="toggleCamera()"
                     style="background: var(--blue); color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; white-space: nowrap;">📷
                     ক্যামেরা</button> </div>
             <div id="reader"></div>
@@ -1163,6 +1168,7 @@
         let allInvoices = [],
             isAdmin = false,
             currentRequestKey = null;
+        let _dashCounter = 0;          // Dashboard race condition guard
         let _reportInvoiceCache = {}; // Date report থেকে fetch করা invoices cache (id → invoice)
         let _currentInvoiceData = null; // WhatsApp পাঠানোর জন্য সর্বশেষ মেমো ডেটা
         let _saveAndWhatsApp = false;   // সেভ করার পর WhatsApp খুলবে কিনা
@@ -1272,18 +1278,59 @@
         // online হলে pending backup পাঠানো updateOnlineStatus() থেকেই হয়
         async function bkDeleteOld() {
             try {
-                const res = await fetch(`${SHEET_URL}?type=old_invoice_ids`);
-                const json = await res.json();
-                const ids = json.data || [];
-                if (!ids.length) return;
-                // ✅ অটো-ডিলিট: শুধু Firebase storage পরিষ্কার — বাকি খাতায় কোনো হাত নেই
-                // কারণ: ২ বছর পুরনো মেমো Firebase থেকে মুছলেও গ্রাহকের বাকি থাকে থাকুক
-                // বাকি খাতা স্বাধীন — শুধু ম্যানুয়াল বাতিল/এডিটে আপডেট হবে
-                for (const id of ids) await db.ref('invoices/' + id).remove();
-                bkToast('', '🗑️', 'পুরনো মেমো পরিষ্কার', ids.length + 'টি পুরনো মেমো Firebase থেকে সরানো হয়েছে');
-            } catch (e) {
-                console.log('bkDeleteOld:', e);
-            }
+                const today = new Date().toISOString().slice(0, 10);
+
+                // ── Firebase থেকে meta পড়ো ──
+                let lastRun = '';
+                let nextDay = '';
+                try {
+                    const metaSnap = await db.ref('settings/delete_meta').once('value');
+                    const meta = metaSnap.val() || {};
+                    lastRun = meta.lastRun || '';
+                    nextDay = meta.nextDay || '';
+                } catch (e) { return; }
+
+                // দিনে একবারের বেশি চলবে না
+                if (lastRun === today) return;
+
+                // ২ বছরের cutoff তারিখ
+                const cutoffDate = new Date();
+                cutoffDate.setFullYear(cutoffDate.getFullYear() - 2);
+                const cutoffStr = cutoffDate.toISOString().slice(0, 10);
+
+                // প্রথমবার — nextDay নেই, cutoff থেকে শুরু করো
+                if (!nextDay) nextDay = cutoffStr;
+
+                // nextDay যদি ২ বছরের মধ্যে চলে এসেছে — delete করার কিছু নেই
+                if (nextDay >= cutoffStr) {
+                    bkToast('', '🗂️', 'পুরনো মেমো চেক হয়েছে', '২ বছরের পুরনো কোনো মেমো পাওয়া যায়নি');
+                    try { await db.ref('settings/delete_meta').set({ lastRun: today, nextDay }); } catch(e) {}
+                    return;
+                }
+
+                // ── শুধু ঐ একদিনের মেমো নামাও ──
+                const snap = await db.ref('invoices').orderByChild('date').equalTo(nextDay).once('value');
+                const invoices = snap.val() || {};
+                const ids = Object.keys(invoices);
+
+                if (!ids.length) {
+                    // ঐ দিনে কোনো মেমো নেই — চুপচাপ পরের দিনে যাও
+                } else {
+                    bkToast('', '🗑️', 'পুরনো মেমো ডিলিট শুরু হয়েছে', nextDay + ' এর ' + ids.length + 'টি মেমো মুছা হচ্ছে...');
+                    for (const id of ids) {
+                        try { await db.ref('invoices/' + id).remove(); } catch (e) {}
+                    }
+                    bkToast('', '✅', 'পুরনো মেমো ডিলিট শেষ হয়েছে', nextDay + ' এর ' + ids.length + 'টি মেমো মুছে গেছে');
+                }
+
+                // ── nextDay ১ দিন এগিয়ে দাও ──
+                const next = new Date(nextDay);
+                next.setDate(next.getDate() + 1);
+                const nextDayStr = next.toISOString().slice(0, 10);
+
+                try { await db.ref('settings/delete_meta').set({ lastRun: today, nextDay: nextDayStr }); } catch(e) {}
+
+            } catch (e) {}
         }
         /* ═══════════════════════════════════════ Functions ═══════════════════════════════════════ */
         let _mgmtLinksListenerActive = false;
@@ -1538,10 +1585,10 @@
             if (!_firebaseListenersActive) {
                 _firebaseListenersActive = true;
 
-                // ── শুধু শেষ ৩০ দিনের মেমো লোড — শুধু Admin-এর জন্য (Bandwidth সাশ্রয়) ──
+                // ── শুধু শেষ ৭ দিনের মেমো লোড — শুধু Admin-এর জন্য (Bandwidth সাশ্রয়) ──
                 if (isAdmin) {
-                    const _30d = new Date(); _30d.setDate(_30d.getDate() - 7);
-                    const _cutoff = _30d.toISOString().split('T')[0];
+                    const _7d = new Date(); _7d.setDate(_7d.getDate() - 7);
+                    const _cutoff = _7d.toISOString().split('T')[0];
                     db.ref('invoices').orderByChild('date').startAt(_cutoff).on('value', snap => {
                         const data = snap.val();
                         allInvoices = data ? Object.values(data).sort((a, b) => {
@@ -2137,7 +2184,7 @@ ${itemsHtml}
             const searchId = document.getElementById('search-id').value.trim();
             if (!searchId) return alert('রশিদ নম্বর লিখুন!');
 
-            // ── ধাপ ১: Local cache (শেষ ৩০ দিন) ──
+            // ── ধাপ ১: Local cache (শেষ ৭ দিন) ──
             let found = allInvoices.find(i => i.id == searchId);
             if (found) { showMemoPreview(found); return; }
 
@@ -2222,6 +2269,7 @@ ${itemsHtml}
             const memoEl  = document.getElementById('stat-memo');
             const todayEl = document.getElementById('stat-today');
             if (!memoEl || !todayEl) return;
+            const _myCount = ++_dashCounter;
             const todayStr = getToday();
             // মেমো সংখ্যা: manual_baki ও payment_baki বাদ (শুধু আসল বিক্রয়)
             const salesToday = allInvoices.filter(i => i.date === todayStr && i.source !== 'manual_baki' && i.source !== 'payment_baki');
@@ -2233,6 +2281,7 @@ ${itemsHtml}
                 Promise.all([
                     db.ref(`${CB}/daily_receipts/${todayStr}`).once('value')
                 ]).then(([crSnap]) => {
+                    if (_myCount !== _dashCounter) return; // পুরনো response, বাতিল
                     const creditCollected = crSnap.val() ? (crSnap.val().total || 0) : 0;
                     // মোট = আসল বিক্রয় নগদ + বাকি আদায়
                     todayEl.innerText = Math.round(posPaid + creditCollected) + "/-";
@@ -3017,8 +3066,8 @@ fb.com/HaziModasserClothStore`;
             const date = document.getElementById('report-date').value;
 
             // ── ৩০ দিনের মধ্যে → local cache, বাইরে → Firebase ──
-            const _30d = new Date(); _30d.setDate(_30d.getDate() - 7);
-            const cutoff = _30d.toISOString().split('T')[0];
+            const _7d = new Date(); _7d.setDate(_7d.getDate() - 7);
+            const cutoff = _7d.toISOString().split('T')[0];
             let filtered;
             _reportInvoiceCache = {}; // প্রতিবার report generate-এ cache রিসেট করো
             if (date >= cutoff) {
@@ -3459,8 +3508,8 @@ fb.com/HaziModasserClothStore`;
             if (!fromDate || !toDate) return;
 
             // ── ৩০ দিনের মধ্যে হলে local cache ব্যবহার করো ──
-            const _30d = new Date(); _30d.setDate(_30d.getDate() - 7);
-            const cutoffStr = _30d.toISOString().split('T')[0];
+            const _7d = new Date(); _7d.setDate(_7d.getDate() - 7);
+            const cutoffStr = _7d.toISOString().split('T')[0];
 
             let filtered;
             // ✅ Fix: payment_baki ও manual_baki বাদ — শুধু আসল বিক্রয় মেমো গণনা হবে
