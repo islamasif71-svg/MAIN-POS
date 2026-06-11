@@ -2615,25 +2615,57 @@ ${itemsHtml}
                 }
 
                 // ══ Credit Book Cleanup: বাকি মেমো বাতিলে ledger থেকেও সরাও ══
-                if (inv.name && inv.name !== "নগদ" && parseFloat(inv.due) > 0) {
+                // ✅ Fix v152: inv.due > 0 condition সরানো হয়েছে — পুরো পেমেন্ট হলেও entry cancel হবে
+                // sale, manual_baki — উভয় source handle করা হয়েছে
+                // payment_baki আলাদা block-এ handle হয় (উপরে), এখানে skip
+                if (inv.source !== 'payment_baki' && inv.name && inv.name !== "নগদ") {
                     const custKey = inv.custKey || makeCustKey(inv.name);
-                    // ✅ Fix Bug#2: inv.due (মূল বাকি) নয় — credit_ledger থেকে remainingDue পড়ো
-                    // কারণ: আংশিক পেমেন্ট হলে inv.due > remainingDue → অন্য invoice এর টাকাও কমে যেতে পারে
-                    db.ref(`${CB}/entries/${custKey}/${id}`).once('value', entSnap => {
-                        const entData = entSnap.val();
-                        // ✅ Critical Fix: 'remainingDue' key EXISTS কিনা চেক করো (0 ও valid value)
-                        // শুধু entry না পাওয়া গেলেই inv.due fallback ব্যবহার করো
-                        const actualRemaining = (entData && 'remainingDue' in entData)
-                            ? Math.max(0, parseFloat(entData.remainingDue) || 0)
-                            : parseFloat(inv.due);
-                        db.ref(`${CB}/entries/${custKey}/${id}/status`).set('cancelled');
-                        db.ref(`${CB}/customers/${custKey}/totalDue`).transaction(cur =>
-                            Math.max(0, Math.round((cur || 0) - actualRemaining))
-                        );
-                        db.ref(`${CB}/customers/${custKey}/lastActivity`).set(Date.now());
-                        bkToast('', '📒', 'বাকি খাতা আপডেট', `${inv.name} — বাকি #${id} বাতিল হয়েছে`);
-                        bkSend('cancel_entry', { memoId: id, custKey, amount: actualRemaining });
-                    });
+                    if (custKey) {
+                        // manual_baki মেমো: credit_ledger entry key হলো 'man_XXXXXXX' (invoiceId নয়)
+                        // sale মেমো: credit_ledger entry key হলো invoice id (numeric string)
+                        // ── প্রথমে numeric id দিয়ে চেক, না পেলে manual key খোঁজো ──
+                        db.ref(`${CB}/entries/${custKey}/${id}`).once('value', entSnap => {
+                            if (entSnap.exists()) {
+                                // sale মেমো — key হলো invoice id
+                                const entData = entSnap.val();
+                                if (entData && entData.status === 'cancelled') return; // আগেই বাতিল
+                                const actualRemaining = ('remainingDue' in (entData||{}))
+                                    ? Math.max(0, parseFloat(entData.remainingDue) || 0)
+                                    : Math.max(0, parseFloat(inv.due) || 0);
+                                db.ref(`${CB}/entries/${custKey}/${id}`).remove();
+                                if (actualRemaining > 0) {
+                                    db.ref(`${CB}/customers/${custKey}/totalDue`).transaction(cur =>
+                                        Math.max(0, Math.round((cur || 0) - actualRemaining))
+                                    );
+                                }
+                                db.ref(`${CB}/customers/${custKey}/lastActivity`).set(Date.now());
+                                bkToast('', '📒', 'বাকি খাতা আপডেট', `${inv.name} — বাকি #${id} বাতিল`);
+                                bkSend('cancel_entry', { memoId: id, custKey, amount: actualRemaining });
+                            } else {
+                                // manual_baki মেমো — invoiceId দিয়ে entry খুঁজো
+                                db.ref(`${CB}/entries/${custKey}`).orderByChild('invoiceId').equalTo(id).once('value', manSnap => {
+                                    if (!manSnap.exists()) return; // কোনো entry নেই — কিছু করার নেই
+                                    manSnap.forEach(child => {
+                                        const entData = child.val();
+                                        if (!entData || entData.status === 'cancelled') return;
+                                        const manKey = child.key;
+                                        const actualRemaining = ('remainingDue' in entData)
+                                            ? Math.max(0, parseFloat(entData.remainingDue) || 0)
+                                            : Math.max(0, parseFloat(inv.due) || 0);
+                                        db.ref(`${CB}/entries/${custKey}/${manKey}`).remove();
+                                        if (actualRemaining > 0) {
+                                            db.ref(`${CB}/customers/${custKey}/totalDue`).transaction(cur =>
+                                                Math.max(0, Math.round((cur || 0) - actualRemaining))
+                                            );
+                                        }
+                                        db.ref(`${CB}/customers/${custKey}/lastActivity`).set(Date.now());
+                                        bkToast('', '📒', 'বাকি খাতা আপডেট', `${inv.name} — বাকি #${id} বাতিল`);
+                                        bkSend('cancel_entry', { memoId: manKey, custKey, amount: actualRemaining });
+                                    });
+                                });
+                            }
+                        });
+                    }
                 }
 
                 // UI আপডেট
