@@ -2819,9 +2819,13 @@ fb.com/HaziModasserClothStore`;
 
             const today = getToday();
 
-            // ── Customer totalDue কমাও (০-এর নিচে যাবে না) ──
+            // ── Customer totalDue কমাও ──
+            // ✅ Fix: আগে এখানে Math.max(0, ...) দিয়ে ০-এর নিচে যেতে দেওয়া হতো না।
+            // এতে বাকি ০ থাকা অবস্থায় মাল ফেরত দিলে সেই টাকা হারিয়ে যেত —
+            // totalDue ঋণাত্মক (negative) হতে দেওয়া হচ্ছে যাতে বোঝা যায় দোকান
+            // গ্রাহকের কাছে সেই পরিমাণ টাকা "পাওনা" (জমা/এডভান্স হিসেবে) রাখে।
             db.ref(`${CB}/customers/${custKey}/totalDue`).transaction(cur =>
-                Math.max(0, Math.round((cur || 0) - returnAmt))
+                Math.round((cur || 0) - returnAmt)
             );
             db.ref(`${CB}/customers/${custKey}/lastActivity`).set(Date.now());
 
@@ -3080,7 +3084,7 @@ fb.com/HaziModasserClothStore`;
                     <span style="font-size:11px;padding:2px 7px;border-radius:10px;white-space:nowrap;
                         background:${c.totalDue > 0 ? '#fff3e0' : '#e8f5e9'};
                         color:${c.totalDue > 0 ? '#e65100' : '#2e7d32'};">
-                        বাকি: ${Math.round(c.totalDue || 0)}/-
+                        ${c.totalDue < 0 ? `জমা: ${Math.round(-c.totalDue)}/-` : `বাকি: ${Math.round(c.totalDue || 0)}/-`}
                     </span>
                 </div>`).join('');
 
