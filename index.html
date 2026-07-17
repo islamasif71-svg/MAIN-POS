@@ -1812,20 +1812,27 @@
             let grand = sub - discAmt;
             // ছাড় subtotal-এর বেশি হলে ০ করো — কিন্তু ফেরত (sub<0) হলে grand negative থাকবে
             if (grand < 0 && sub >= 0) grand = 0;
-            let paid = parseFloat(document.getElementById('paid-amt').value) || 0;
-            // ✅ Fix v1055: ফেরত/এক্সচেঞ্জেও (sub<0) জমা cap করা হচ্ছে — নাহলে ফেরতের
-            // চেয়ে বেশি "জমা" লিখলে ভুল (উল্টো) হিসাব হতো।
-            if (sub >= 0 && paid > grand) {
-                paid = grand;
-                document.getElementById('paid-amt').value = Math.round(paid);
-            } else if (sub < 0 && paid > Math.abs(grand)) {
-                paid = Math.abs(grand);
-                document.getElementById('paid-amt').value = Math.round(paid);
+            // ✅ Fix v1059: paid-এর দুইটা আলাদা কাজ — (ক) বাকি(due) হিসাব, যেখানে শুধু
+            // পরিমাণ (magnitude) দরকার, সাইন না; (খ) রিপোর্ট/ক্যাশ হিসাব (sumPaid, আজকের
+            // মোট বিক্রয়), যেখানে সাইন জরুরি — ফেরতে ক্যাশ দোকান থেকে বের হয়, তাই ওটা
+            // নেগেটিভ না হলে দিনের মোট ক্যাশ থেকে ঠিকমতো বিয়োগ হবে না।
+            // আগে এই দুটো এক ভ্যারিয়েবল (paid) দিয়ে হিসাব হতো বলেই সমস্যা হচ্ছিল: paid
+            // পজিটিভ ধরে due ঠিক করতে গেলে রিপোর্টের সাইন নষ্ট হতো (v1058), আবার paid-এর
+            // সাইন যা লেখা হয়েছে তাই দিয়ে due হিসাব করলে ফেরতে মাইনাস লিখলে ডাবল হতো (v1055)।
+            // এখন দুটো আলাদা: paidAbs (শুধু due হিসাবের জন্য, সবসময় ধনাত্মক) আর paid
+            // (সেভ/রিপোর্টের জন্য, মেমোর ধরন অনুযায়ী অটো-সাইন হবে) — ইউজার + বা - যাই লিখুক।
+            let paidAbs = Math.abs(parseFloat(document.getElementById('paid-amt').value) || 0);
+            if (sub >= 0 && paidAbs > grand) {
+                paidAbs = grand;
+            } else if (sub < 0 && paidAbs > Math.abs(grand)) {
+                paidAbs = Math.abs(grand);
             }
-            // ✅ Fix v1055: ফেরতে জমা দেওয়া মানে হাতে হাতে ক্যাশ মিটিয়ে দেওয়া — তাই বাকি
-            // শূন্যের দিকে যাওয়া উচিত। আগে "grand - paid" ছিল, যেটাতে জমা দিলে বাকি উল্টো
-            // আরও বেড়ে যেতো (-৩০০ জমা ৩০০ দিলে -৬০০ দেখাতো)। এখন "grand + paid"।
-            let due = sub < 0 ? (grand + paid) : Math.max(0, grand - paid);
+            // ফেরত মেমোতে (sub<0) ক্যাশ বের হয় → নেগেটিভ; বিক্রয়ে (sub>=0) ক্যাশ ঢোকে → পজিটিভ
+            let paid = sub < 0 ? -paidAbs : paidAbs;
+            document.getElementById('paid-amt').value = paidAbs === 0 ? '' : Math.round(paid);
+            // বাকি সবসময় ধনাত্মক magnitude (paidAbs) দিয়ে হিসাব হয় — তাই ইনপুটে + বা -
+            // যাই লেখা হোক, due কখনো ডাবল হবে না।
+            let due = sub < 0 ? (grand + paidAbs) : Math.max(0, grand - paidAbs);
             document.getElementById('due-amt').value  = Math.round(due);
             document.getElementById('grand-display').innerText = "সর্বমোট: " + Math.round(grand) + "/-";
             return { sub, grand, discAmt, paid, due };
